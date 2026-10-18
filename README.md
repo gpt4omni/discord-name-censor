@@ -2,11 +2,11 @@
 
 Hide your name and avatar in Discord screenshots before you share them. Mark something once, and every copy of it in every screenshot gets covered.
 
-Everything runs in your browser. No images are uploaded anywhere.
+Live at **https://censor.works4you.dev**. Everything runs in your browser. No images are uploaded anywhere.
 
 ## Use it
 
-Open `index.html` in any modern browser, or host the folder with GitHub Pages.
+Go to https://censor.works4you.dev, or open `public/index.html` in any modern browser.
 
 1. Add screenshots: drop them on the page, paste with Ctrl+V, or click **Add images**. You can add as many as you like.
 2. Drag a box around your name on one message. Every identical copy in every screenshot is covered.
@@ -32,3 +32,11 @@ Tick **Remember my things to hide on this device** and new screenshots are censo
 - JPEG screenshots and hover-highlighted messages still match.
 - **Solid block** is the safest style. Blurred or pixelated text can sometimes be recovered.
 - The zip download loads JSZip from cdnjs. Without it, each screenshot downloads as a separate file.
+
+## Deploy
+
+The site is static files in `public/`, served by Cloudflare Workers static assets. `wrangler.jsonc` binds it to the custom domain.
+
+```bash
+npx wrangler deploy
+```
