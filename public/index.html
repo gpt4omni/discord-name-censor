@@ -3,182 +3,242 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Screenshot Name Censor</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235865f2'/%3E%3Crect x='7' y='12' width='18' height='8' rx='2' fill='%23000'/%3E%3C/svg%3E">
+<title>censor · hide your name in discord screenshots</title>
+<meta name="description" content="hide your name and avatar in discord screenshots before you share them. runs in your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23e56aa5'/%3E%3Crect x='6' y='12' width='20' height='8' rx='1' fill='%231b1b1b'/%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
 <style>
 :root{
-  --bg:#f2f3f5;--panel:#ffffff;--text:#1e1f22;--muted:#5c5e66;--border:#d7d9de;
-  --accent:#5865f2;--accent-text:#ffffff;--danger:#da373c;--stage:#e3e5e8;--input:#ebedef;--hover:#e0e1e5;
-}
-@media (prefers-color-scheme:dark){
-  :root{--bg:#1e1f22;--panel:#2b2d31;--text:#f2f3f5;--muted:#b5bac1;--border:#3f4147;
-    --stage:#111214;--input:#1e1f22;--hover:#35373c}
+  color-scheme:light;
+  --ui:Tahoma,"Segoe UI",Verdana,Geneva,sans-serif;
+  --title-font:"Trebuchet MS",Tahoma,sans-serif;
+  --text:#1b1b1b;--dim:#5d5870;--link:#0b56d0;--link-hover:#d1418a;
+  --pink:#e56aa5;--pink-dark:#d1418a;--lilac:#9a7fe0;--sel:#316ac5;
+  --line:#d6cfe6;--face:#f6f3fb;--window:#ffffff;--btn-line:#8e86a8;
+  --pane-head:#7b3a7f;--soft:#fde6f1;--soft-line:#f3b6d3;
+  --stage:#313338;--stage-text:#dbdee1;--stage-dim:#949ba4;
+  --balloon:#ffffe1;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-button,.btn{font:inherit;border:1px solid var(--border);background:var(--input);color:var(--text);
-  padding:6px 12px;border-radius:6px;cursor:pointer;white-space:nowrap}
-button:hover:not(:disabled),.btn:hover{border-color:var(--accent)}
-button.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
-button:disabled{opacity:.45;cursor:default}
-kbd{font:12px ui-monospace,monospace;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--input)}
+body{font:12px/1.5 var(--ui);color:var(--text);background:#bcd3f2 linear-gradient(180deg,#8fb5ea 0%,#bcd3f2 55%,#d9e6f8 100%);padding:14px}
+a{color:var(--link);text-decoration:none}
+a:hover{color:var(--link-hover);text-decoration:underline}
+:focus-visible{outline:1px dotted #000;outline-offset:2px}
 
-header{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel);flex-wrap:wrap}
-header h1{font-size:16px;margin:0 auto 0 0;font-weight:650}
+button,.btn{font:12px var(--ui);color:var(--text);padding:3px 11px;min-height:24px;border:1px solid var(--btn-line);border-radius:3px;cursor:pointer;white-space:nowrap;
+  background:linear-gradient(180deg,#fff 0%,#f4f1f9 55%,#e3dcef 100%)}
+button:hover:not(:disabled){border-color:var(--pink-dark);box-shadow:inset 0 0 0 1px var(--soft-line)}
+button:active:not(:disabled){background:linear-gradient(180deg,#e3dcef,#f6f3fb)}
+button:disabled{color:#a39fb0;border-color:#c9c4d6;cursor:default;background:var(--face)}
+button.primary{color:#fff;border-color:#b3477f;font-weight:bold;text-shadow:0 1px 0 rgba(0,0,0,.25);
+  background:linear-gradient(180deg,#f6a8cf 0%,#e56aa5 50%,#d1418a 100%)}
+button.primary:disabled{color:#fff;opacity:.55}
+button.primary:hover:not(:disabled){box-shadow:inset 0 0 0 1px rgba(255,255,255,.45)}
+kbd{font:11px var(--ui);border:1px solid var(--btn-line);border-bottom-width:2px;border-radius:3px;padding:0 4px;background:#fff;color:var(--text)}
 
-main{flex:1;min-height:0;display:grid;grid-template-columns:310px 1fr}
-aside{background:var(--panel);border-right:1px solid var(--border);padding:16px;overflow:auto;display:flex;flex-direction:column;gap:20px}
-aside h2{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 8px}
-.hint{color:var(--muted);font-size:13px;margin:0}
-.hint b{color:var(--text);font-weight:600}
+.window{height:100%;display:flex;flex-direction:column;background:var(--window);border:1px solid #a768ad;border-radius:8px 8px 3px 3px;overflow:hidden;
+  box-shadow:0 8px 28px rgba(40,30,90,.35)}
+.titlebar{flex:none;display:flex;align-items:center;gap:8px;height:30px;padding:0 6px 0 9px;color:#fff;
+  background:linear-gradient(180deg,rgba(255,255,255,.38) 0%,rgba(255,255,255,.08) 48%,rgba(0,0,0,0) 52%),linear-gradient(90deg,#e56aa5 0%,#c779c9 55%,#9a7fe0 100%)}
+.titlebar h1{margin:0;font:bold 13px var(--title-font);text-shadow:1px 1px 0 rgba(80,20,70,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.titlebar h1 span{font-weight:normal;opacity:.9}
+.titlebar .by{margin-left:auto;flex:none;color:#fff;font-size:11px;padding:2px 9px;border:1px solid rgba(255,255,255,.7);border-radius:3px;background:rgba(255,255,255,.16)}
+.titlebar .by:hover{background:rgba(255,255,255,.3);color:#fff;text-decoration:none}
 
-#samples{display:flex;flex-direction:column;gap:8px}
-.sample{border:1px solid var(--border);border-radius:8px;padding:8px 10px}
-.sample .top{display:flex;align-items:center;gap:8px}
-.sample .thumb{flex:none;width:44px;height:30px;border-radius:4px;border:2px solid;display:grid;place-items:center;overflow:hidden;background:#000}
+.commands{flex:none;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 8px;background:var(--face);border-bottom:1px solid var(--line)}
+.commands .sep{width:1px;align-self:stretch;margin:2px 4px;background:var(--line)}
+.commands .spacer{flex:1}
+.seg{display:flex}
+.seg button{border-radius:0}
+.seg button:first-child{border-radius:3px 0 0 3px}
+.seg button:last-child{border-radius:0 3px 3px 0;margin-left:-1px}
+.seg button.on{background:linear-gradient(180deg,#e3dcef,#f6f3fb);box-shadow:inset 0 1px 3px rgba(60,40,90,.3);font-weight:bold}
+#zoomPct{width:40px;text-align:center;color:var(--dim)}
+
+main{flex:1;min-height:0;display:grid;grid-template-columns:250px 1fr}
+.tasks{order:-1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px;border-right:1px solid var(--line);
+  background:linear-gradient(180deg,#f7dbec 0%,#e2cdf2 60%,#cfbdf0 100%)}
+.pane{background:#fff;border-radius:4px 4px 2px 2px;box-shadow:0 1px 2px rgba(80,40,110,.18)}
+.pane>h2,.pane>summary{margin:0;padding:5px 10px;font:bold 12px var(--title-font);color:var(--pane-head);border-radius:4px 4px 0 0;
+  background:linear-gradient(90deg,#fff 0%,#fbeaf4 60%,#f0d7ea 100%)}
+.pane>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between}
+.pane>summary::-webkit-details-marker{display:none}
+.pane>summary::after{content:"▾";font-size:10px}
+.pane[open]>summary::after{content:"▴"}
+.pane .body{padding:8px 10px 10px;background:#fdf6fa;border-top:1px solid #fff;border-radius:0 0 2px 2px}
+.hint{color:var(--dim);margin:0}
+.hint b{color:var(--text)}
+.pane ol{margin:0;padding-left:16px}
+.pane li{margin:3px 0}
+.pane li::marker{color:var(--pink-dark)}
+
+#samples{display:flex;flex-direction:column;gap:6px}
+.sample{background:#fff;border:1px solid var(--line);border-radius:3px;padding:6px 7px}
+.sample .top{display:flex;align-items:center;gap:6px}
+.sample .thumb{flex:none;width:40px;height:26px;border-radius:2px;border:2px solid;display:grid;place-items:center;overflow:hidden;background:var(--stage)}
 .sample .thumb img{max-width:100%;max-height:100%;image-rendering:pixelated}
-.sample input[type=text]{flex:1;min-width:0;font:inherit;font-weight:600;background:transparent;color:var(--text);border:1px solid transparent;border-radius:4px;padding:2px 4px}
-.sample input[type=text]:hover,.sample input[type=text]:focus{border-color:var(--border);outline:none}
-.sample .count{color:var(--muted);font-size:12px;white-space:nowrap}
-.x{padding:0 7px;line-height:20px;color:var(--muted)}
-.x:hover:not(:disabled){color:var(--danger);border-color:var(--danger)}
-.sample .thr{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--muted)}
-.sample .thr span{width:34px;text-align:right}
-.empty-list{color:var(--muted);font-size:13px;border:1px dashed var(--border);border-radius:8px;padding:10px}
+.sample input[type=text]{flex:1;min-width:0;font:bold 12px var(--ui);background:transparent;color:var(--text);border:1px solid transparent;border-radius:2px;padding:1px 3px}
+.sample input[type=text]:hover,.sample input[type=text]:focus{border-color:var(--btn-line);background:#fff;outline:none}
+.sample .count{color:var(--dim);font-size:11px;white-space:nowrap}
+.x{min-height:0;padding:0 6px;line-height:16px;font-size:12px}
+.x:hover:not(:disabled){color:#fff;border-color:#b3302f;background:linear-gradient(180deg,#e9826b,#c7402a)}
+.sample .thr{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:var(--dim)}
+.sample .thr span{width:30px;text-align:right}
+.empty-list{color:var(--dim)}
 
-.row{display:flex;align-items:center;gap:8px;margin:8px 0}
-.row label{flex:1;color:var(--muted)}
-select,input[type=color]{font:inherit;background:var(--input);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px}
-input[type=color]{width:40px;height:30px;padding:2px}
-input[type=range]{width:100%;accent-color:var(--accent)}
-input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
-details summary{cursor:pointer;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
-details ol{padding-left:18px;margin:8px 0 0}
-details li{margin:4px 0}
+.row{display:flex;align-items:center;gap:8px;margin:0 0 7px}
+.row label{flex:1}
+select{font:12px var(--ui);color:var(--text);background:#fff;border:1px solid #7f9db9;border-radius:0;padding:2px}
+input[type=color]{width:30px;height:22px;padding:1px;border:1px solid #7f9db9;background:#fff}
+input[type=range]{width:100%;accent-color:var(--pink-dark)}
+input[type=checkbox]{accent-color:var(--pink-dark);width:13px;height:13px;margin:0}
+.check{display:flex;gap:7px;align-items:flex-start;cursor:pointer}
+.check input{margin-top:2px}
+.links{display:flex;flex-direction:column;gap:4px}
+.links a{display:flex;align-items:center;gap:7px}
+.links .ico{width:16px;height:16px;flex:none;border-radius:3px;display:grid;place-items:center;font:bold 10px var(--ui);color:#fff}
 
 #right{display:flex;flex-direction:column;min-width:0;min-height:0}
-#toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--panel);flex-wrap:wrap}
-.seg{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
-.seg button{border:0;border-radius:0;background:var(--input)}
-.seg button.on{background:var(--accent);color:var(--accent-text)}
-#toolbar .spacer{flex:1}
-#zoomPct{width:44px;text-align:center;color:var(--muted);font-size:12px}
-#toolbar .peek{color:var(--muted);font-size:12px}
-
+#stageBox{position:relative;flex:1;min-height:0;display:flex}
 #stage{position:relative;flex:1;min-width:0;min-height:0;overflow:auto;background:var(--stage);display:flex}
-#drop{margin:auto;padding:48px 32px;border:2px dashed var(--border);border-radius:12px;text-align:center;max-width:460px;color:var(--muted)}
-#drop strong{display:block;color:var(--text);font-size:17px;margin-bottom:8px}
-#drop button{margin-top:16px}
+#drop{margin:auto;padding:36px 32px;max-width:420px;text-align:center;color:var(--stage-dim);border:2px dashed #5c5f66;border-radius:6px}
+#drop strong{display:block;color:var(--stage-text);font:bold 16px var(--title-font);margin-bottom:6px}
+#drop button{margin-top:16px;padding:5px 16px}
 #wrap{position:relative;margin:auto;display:none;line-height:0;padding:16px 0}
 #wrap canvas{display:block;width:100%}
 #overlay{position:absolute;left:0;top:16px;height:calc(100% - 32px);cursor:crosshair;touch-action:none}
-#stageBox{position:relative;flex:1;min-height:0;display:flex}
-#banner{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:none;z-index:2;max-width:calc(100% - 32px);text-align:center;
-  background:var(--accent);color:var(--accent-text);padding:8px 16px;border-radius:999px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.3);pointer-events:none}
-body.dragging #stage::after{content:"Drop images to add them";position:absolute;inset:8px;border:3px dashed var(--accent);border-radius:12px;
-  display:grid;place-items:center;font-size:18px;font-weight:600;color:var(--text);background:color-mix(in srgb,var(--stage) 80%,transparent);pointer-events:none}
+.balloon{background:var(--balloon);color:#000;border:1px solid #000;border-radius:7px;padding:6px 11px;box-shadow:2px 3px 6px rgba(0,0,0,.35);font:12px var(--ui)}
+#banner{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:none;z-index:2;max-width:calc(100% - 32px);text-align:center;pointer-events:none}
+body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;border:2px dashed var(--pink);border-radius:6px;
+  display:grid;place-items:center;font:bold 16px var(--title-font);color:#fff;background:rgba(229,106,165,.18);pointer-events:none}
 
-#strip{display:none;gap:8px;padding:8px 12px;border-top:1px solid var(--border);background:var(--panel);overflow-x:auto;flex:none}
-.tile{position:relative;flex:none;width:96px;cursor:pointer;border:2px solid transparent;border-radius:8px;padding:3px;background:var(--input)}
-.tile.on{border-color:var(--accent)}
-.tile img{display:block;width:100%;height:56px;object-fit:cover;object-position:top;border-radius:5px}
-.tile .meta{display:flex;justify-content:space-between;gap:4px;font-size:11px;color:var(--muted);margin-top:3px;line-height:1.2}
-.tile .meta span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tile .x{position:absolute;top:6px;right:6px;padding:0 5px;line-height:16px;font-size:12px;background:var(--panel);opacity:0}
-.tile:hover .x{opacity:1}
-.add-tile{flex:none;width:96px;border:2px dashed var(--border);border-radius:8px;display:grid;place-items:center;color:var(--muted);cursor:pointer;font-size:13px;background:transparent}
+#strip{display:none;gap:6px;padding:6px 8px;border-top:1px solid var(--line);background:var(--face);overflow-x:auto;flex:none}
+.tile{position:relative;flex:none;width:92px;cursor:pointer;border:1px solid transparent;border-radius:2px;padding:3px}
+.tile:hover{border-color:var(--line);background:#fff}
+.tile.on{border-color:var(--sel);background:#dce8fb}
+.tile img{display:block;width:100%;height:52px;object-fit:cover;object-position:top;border:1px solid var(--line)}
+.tile .meta{display:flex;justify-content:space-between;gap:4px;font-size:11px;color:var(--dim);margin-top:2px;line-height:1.25}
+.tile .meta span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.tile .x{position:absolute;top:6px;right:6px;opacity:0}
+.tile:hover .x,.tile .x:focus-visible{opacity:1}
+.add-tile{flex:none;width:92px;min-height:74px;border:1px dashed var(--btn-line);border-radius:2px;background:transparent;color:var(--dim)}
 
-#status{position:fixed;bottom:16px;right:16px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 12px;display:none;box-shadow:0 4px 16px rgba(0,0,0,.25);z-index:5}
+.statusbar{flex:none;display:flex;gap:10px;align-items:center;padding:3px 10px;font-size:11px;color:var(--dim);background:var(--face);border-top:1px solid var(--line)}
+.statusbar .cell{padding-right:10px;border-right:1px solid var(--line)}
+.statusbar .end{margin-left:auto}
+#status{position:fixed;bottom:44px;right:24px;display:none;z-index:5}
 
 @media (max-width:760px){
-  main{grid-template-columns:1fr;grid-template-rows:auto minmax(70vh,1fr)}
-  aside{border-right:0;border-bottom:1px solid var(--border);order:2}
-  #right{order:1;min-height:70vh}
-  header h1{font-size:15px;width:100%}
-  #toolbar .peek{display:none}
+  body{padding:0}
+  .window{border-radius:0;border:0}
+  main{grid-template-columns:1fr;grid-template-rows:minmax(65vh,1fr) auto;overflow:auto}
+  .tasks{order:0;border-right:0;border-top:1px solid var(--line)}
+  #right{min-height:65vh}
+  .titlebar h1 span,.peek,.commands .sep{display:none}
+  .statusbar .cell:not(:first-child){display:none}
 }
 </style>
 </head>
 <body>
-<header>
-  <h1>Screenshot Name Censor</h1>
-  <button id="addBtn">Add images</button>
-  <button id="copy" disabled title="Copy current image">Copy</button>
-  <button id="save" disabled>Download</button>
-  <button id="saveAll" class="primary" disabled>Download all</button>
-  <input id="file" type="file" accept="image/*" multiple hidden>
-</header>
-<main>
-  <aside>
-    <section>
-      <h2>Things to hide</h2>
-      <div id="samples"></div>
-    </section>
-    <section>
-      <h2>Look</h2>
-      <div class="row"><label for="style">Style</label>
-        <select id="style">
-          <option value="solid">Solid block</option>
-          <option value="pixel">Pixelate</option>
-          <option value="blur">Blur</option>
-        </select>
-        <input type="color" id="color" value="#000000" title="Block color">
-      </div>
-      <div class="row"><label for="pad">Padding</label><input type="range" id="pad" min="0" max="12" value="2" style="width:130px"></div>
-      <div class="row"><label for="outlines">Show outlines while editing</label><input type="checkbox" id="outlines" checked></div>
-      <p class="hint">Solid block is the safe choice. Blurred or pixelated text can sometimes be read back.</p>
-    </section>
-    <section>
-      <div class="row" style="margin:0"><label for="remember">Remember my things to hide on this device</label><input type="checkbox" id="remember"></div>
-      <p class="hint">Next time, new screenshots get censored as soon as you add them.</p>
-    </section>
-    <details>
-      <summary>How it works</summary>
-      <ol class="hint">
-        <li>Add one or more screenshots: drop, paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>, or pick files.</li>
-        <li>Drag a box around <b>your name</b>. Every identical copy, in every screenshot, gets covered.</li>
-        <li>Do the same for <b>your avatar</b>, and for the <b>small name and avatar</b> in reply lines.</li>
-        <li><b>Click</b> a box to switch a single match off or on. Lower a slider if some copies were missed.</li>
-        <li>Hold <kbd>Space</kbd> to peek at the original. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes. <kbd>←</kbd> <kbd>→</kbd> switch screenshots.</li>
-      </ol>
-      <p class="hint" style="margin-top:8px">Matching needs the same Discord zoom level. A screenshot taken at a different zoom needs its own boxes.</p>
-      <p class="hint" style="margin-top:8px">Nothing is uploaded. All processing stays in your browser.</p>
-    </details>
-  </aside>
-  <div id="right">
-    <div id="toolbar">
-      <div class="seg" id="mode">
-        <button data-mode="match" class="on" title="Shortcut: M">Hide all copies</button>
-        <button data-mode="box" title="Shortcut: B">Single box</button>
-      </div>
-      <span class="peek">Hold <kbd>Space</kbd> to peek</span>
-      <div class="spacer"></div>
-      <button id="undo" disabled title="Ctrl+Z">Undo</button>
-      <button id="zoomOut" title="Zoom out">−</button>
-      <span id="zoomPct">100%</span>
-      <button id="zoomIn" title="Zoom in">+</button>
-      <button id="zoomFit">Fit</button>
-    </div>
-    <div id="stageBox">
-    <div id="banner"></div>
-    <div id="stage">
-      <div id="drop">
-        <strong>Drop screenshots here</strong>
-        Or paste with Ctrl+V. Add as many as you like; whatever you hide in one is hidden in all of them.
-        <br><button class="primary" id="pickBtn">Choose images</button>
-      </div>
-      <div id="wrap">
-        <canvas id="base"></canvas>
-        <canvas id="overlay"></canvas>
-      </div>
-    </div>
-    </div>
-    <div id="strip"></div>
+<div class="window">
+  <div class="titlebar">
+    <h1>censor <span>· hide your name in discord screenshots</span></h1>
+    <a class="by" href="https://milly.works4you.dev/" target="_blank" rel="noopener">made by milly</a>
   </div>
-</main>
-<div id="status"></div>
+  <div class="commands">
+    <button id="addBtn">add screenshots</button>
+    <button id="copy" disabled title="copy this screenshot">copy</button>
+    <button id="save" disabled>save</button>
+    <button id="saveAll" class="primary" disabled>save all</button>
+    <input id="file" type="file" accept="image/*" multiple hidden>
+    <span class="sep"></span>
+    <div class="seg" id="mode">
+      <button data-mode="match" class="on" title="shortcut: M">hide every copy</button>
+      <button data-mode="box" title="shortcut: B">single box</button>
+    </div>
+    <span class="hint peek">hold <kbd>space</kbd> to peek</span>
+    <span class="spacer"></span>
+    <button id="undo" disabled title="ctrl+z">undo</button>
+    <button id="zoomOut" title="zoom out">−</button>
+    <span id="zoomPct">100%</span>
+    <button id="zoomIn" title="zoom in">+</button>
+    <button id="zoomFit">fit</button>
+  </div>
+  <main>
+    <div id="right">
+      <div id="stageBox">
+        <div id="banner" class="balloon"></div>
+        <div id="stage">
+          <div id="drop">
+            <strong>drop screenshots here</strong>
+            or paste with ctrl+v. add as many as you want. anything you hide in one gets hidden in all of them.
+            <br><button class="primary" id="pickBtn">choose files</button>
+          </div>
+          <div id="wrap">
+            <canvas id="base"></canvas>
+            <canvas id="overlay"></canvas>
+          </div>
+        </div>
+      </div>
+      <div id="strip"></div>
+    </div>
+    <aside class="tasks">
+      <section class="pane">
+        <h2>things to hide</h2>
+        <div class="body"><div id="samples"></div></div>
+      </section>
+      <section class="pane">
+        <h2>look</h2>
+        <div class="body">
+          <div class="row"><label for="style">style</label>
+            <select id="style">
+              <option value="solid">solid block</option>
+              <option value="pixel">pixelate</option>
+              <option value="blur">blur</option>
+            </select>
+            <input type="color" id="color" value="#000000" title="block colour">
+          </div>
+          <div class="row"><label for="pad">padding</label><input type="range" id="pad" min="0" max="12" value="2" style="width:110px"></div>
+          <label class="check" style="margin-bottom:7px"><input type="checkbox" id="outlines" checked><span>show outlines while editing</span></label>
+          <p class="hint">solid block is the safe one. blur and pixelate can sometimes be undone.</p>
+        </div>
+      </section>
+      <section class="pane">
+        <h2>remember</h2>
+        <div class="body">
+          <label class="check"><input type="checkbox" id="remember"><span>remember these on this device. new screenshots get censored the moment you add them.</span></label>
+        </div>
+      </section>
+      <details class="pane">
+        <summary>how to use</summary>
+        <div class="body">
+          <ol class="hint">
+            <li>add screenshots: drop them in, paste with <kbd>ctrl</kbd>+<kbd>v</kbd>, or pick files.</li>
+            <li>drag a box around <b>your name</b>. every copy in every screenshot gets covered.</li>
+            <li>do the same for <b>your avatar</b>, and the <b>small name and avatar</b> on reply lines.</li>
+            <li><b>click</b> a box to turn one match off or on. lower a slider if some copies got missed.</li>
+            <li>hold <kbd>space</kbd> to see the original. <kbd>ctrl</kbd>+<kbd>z</kbd> undoes. <kbd>←</kbd> <kbd>→</kbd> switch screenshots.</li>
+          </ol>
+          <p class="hint" style="margin-top:6px">matching needs the same discord zoom level. a screenshot at a different zoom needs its own boxes.</p>
+        </div>
+      </details>
+      <section class="pane">
+        <h2>find me</h2>
+        <div class="body links">
+          <a href="https://milly.works4you.dev/" target="_blank" rel="noopener"><span class="ico" style="background:var(--pink)">m</span>milly.works4you.dev</a>
+          <a href="https://github.com/starsfellontrench/discord-name-censor" target="_blank" rel="noopener"><span class="ico" style="background:#24292f">&lt;/&gt;</span>source on github</a>
+        </div>
+      </section>
+    </aside>
+  </main>
+  <div class="statusbar">
+    <span class="cell" id="objects">no screenshots</span>
+    <span class="cell">nothing leaves your browser</span>
+    <span class="end"><a href="https://milly.works4you.dev/" target="_blank" rel="noopener">milly.works4you.dev</a></span>
+  </div>
+</div>
+<div id="status" class="balloon"></div>
 
 <script id="workerSrc" type="text/plain">
 const imgs = new Map();
@@ -327,7 +387,7 @@ function findAll(im, tpl, tw, th, origin) {
 <script>
 const $ = id => document.getElementById(id);
 const base = $('base'), over = $('overlay'), bctx = base.getContext('2d'), octx = over.getContext('2d');
-const COLORS = ['#5865f2', '#23a55a', '#f0b232', '#eb459e', '#00a8fc', '#f47b67', '#a970ff', '#3ba55c'];
+const COLORS = ['#e56aa5', '#9a7fe0', '#4a90e2', '#3fae2a', '#f0a030', '#1aa6b7', '#d1418a', '#7b5cd6'];
 const BOX_COLOR = '#9aa0a6';
 const STORE = { samples: 'namecensor.samples.v1', look: 'namecensor.look.v1' };
 
@@ -335,7 +395,7 @@ const workerUrl = URL.createObjectURL(new Blob([$('workerSrc').textContent], { t
 const POOL = Array.from({ length: Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 2) - 1)) }, () => {
   const w = new Worker(workerUrl);
   w.onmessage = onResult;
-  w.onerror = e => toast('Match search failed: ' + e.message, 4000);
+  w.onerror = e => toast('matching broke: ' + e.message, 4000);
   return w;
 });
 
@@ -374,7 +434,7 @@ async function decode(file) {
 
 async function addFiles(files) {
   const list = [...files].filter(f => f.type.startsWith('image/'));
-  if (!list.length) { toast('No images in that'); return; }
+  if (!list.length) { toast('no images in that'); return; }
   let first = null;
   for (const f of list) {
     try {
@@ -382,10 +442,10 @@ async function addFiles(files) {
       S.images.push(im);
       first ??= im;
       for (const s of S.samples) runMatch(im, s);
-    } catch { toast(`Couldn't open ${f.name || 'image'}`); }
+    } catch { toast(`couldn't open ${f.name || 'that image'}`); }
   }
   if (first) select(first);
-  if (list.length > 1) toast(`Added ${list.length} screenshots`);
+  if (list.length > 1) toast(`added ${list.length} screenshots`);
 }
 
 function removeImage(im) {
@@ -418,7 +478,7 @@ function runMatch(im, s) {
 function onResult(e) {
   const { imageId, sampleId, matches, error } = e.data;
   S.pending--;
-  if (error) toast('Search failed for one screenshot: ' + error, 4000);
+  if (error) toast('matching failed on one screenshot: ' + error, 4000);
   const im = S.images.find(i => i.id === imageId);
   if (im && S.samples.some(s => s.id === sampleId) && im.results.has(sampleId)) {
     im.results.set(sampleId, matches);
@@ -432,7 +492,7 @@ function onResult(e) {
 function idle() { return S.pending ? new Promise(r => S.waiters.push(r)) : Promise.resolve(); }
 
 function showProgress() {
-  if (S.pending) setStatus(`Finding matches… ${S.pending} left`);
+  if (S.pending) setStatus(`looking for matches… ${S.pending} left`);
   else if ($('status').dataset.kind === 'progress') setStatus('');
 }
 
@@ -489,7 +549,7 @@ function sampleFromSelection(im, r) {
   r = trim(im, r);
   const data = im.ctx.getImageData(r.x, r.y, r.w, r.h).data;
   const n = S.samples.length + 1;
-  const s = { id: uid(), label: `Item ${n}`, color: freeColor(), w: r.w, h: r.h, data, thr: 0.97,
+  const s = { id: uid(), label: `item ${n}`, color: freeColor(), w: r.w, h: r.h, data, thr: 0.97,
     origin: { imageId: im.id, x: r.x, y: r.y }, thumb: pngOf(data, r.w, r.h) };
   addSample(s);
   pushUndo({ label: 'add', undo: () => removeSample(s, false) });
@@ -602,8 +662,8 @@ function drawOverlay() {
 function renderBanner() {
   const b = $('banner');
   let text = '';
-  if (S.cur && !S.samples.length && !S.cur.boxes.length) text = 'Drag a box around your name to hide it everywhere';
-  else if (S.cur && S.samples.length === 1 && S.samples[0].origin && S.mode === 'match' && S.undo.length <= 1) text = 'Nice. Now drag around your avatar';
+  if (S.cur && !S.samples.length && !S.cur.boxes.length) text = 'drag a box around your name to hide it everywhere';
+  else if (S.cur && S.samples.length === 1 && S.samples[0].origin && S.mode === 'match' && S.undo.length <= 1) text = 'nice. now drag a box around your avatar';
   b.textContent = text;
   b.style.display = text ? 'block' : 'none';
 }
@@ -611,7 +671,7 @@ function renderBanner() {
 function renderSamples() {
   const el = $('samples');
   if (!S.samples.length) {
-    el.innerHTML = `<div class="empty-list">${S.images.length ? 'Drag a box around your name on the screenshot.' : 'Add a screenshot, then drag a box around your name.'}</div>`;
+    el.innerHTML = `<div class="empty-list">${S.images.length ? 'drag a box around your name on the screenshot.' : 'add a screenshot, then drag a box around your name.'}</div>`;
     return;
   }
   el.innerHTML = '';
@@ -620,15 +680,15 @@ function renderSamples() {
     d.className = 'sample'; d.dataset.id = s.id;
     d.innerHTML = `<div class="top">
         <span class="thumb" style="border-color:${s.color}"><img alt=""></span>
-        <input type="text" aria-label="Name">
+        <input type="text" aria-label="name">
         <span class="count"></span>
-        <button class="x" title="Remove">×</button>
+        <button class="x" title="remove">×</button>
       </div>
-      <div class="thr"><label>Similarity</label><input type="range" min="50" max="100" step="1"><span></span></div>`;
+      <div class="thr"><label>similarity</label><input type="range" min="50" max="100" step="1"><span></span></div>`;
     d.querySelector('img').src = s.thumb;
     const name = d.querySelector('input[type=text]');
     name.value = s.label;
-    name.oninput = () => { s.label = name.value || 'Item'; saveSamples(); };
+    name.oninput = () => { s.label = name.value || 'item'; saveSamples(); };
     name.onkeydown = e => { if (e.key === 'Enter' || e.key === 'Escape') name.blur(); };
     const range = d.querySelector('input[type=range]'), pct = d.querySelector('.thr span');
     range.value = Math.round(s.thr * 100); pct.textContent = range.value + '%';
@@ -648,7 +708,7 @@ function renderStrip() {
     const t = document.createElement('div');
     t.className = 'tile' + (im === S.cur ? ' on' : ''); t.dataset.id = im.id;
     t.title = im.stem;
-    t.innerHTML = `<img alt=""><div class="meta"><span></span><span class="n"></span></div><button class="x" title="Remove screenshot">×</button>`;
+    t.innerHTML = `<img alt=""><div class="meta"><span></span><span class="n"></span></div><button class="x" title="remove screenshot">×</button>`;
     t.querySelector('img').src = im.url;
     t.querySelector('.meta span').textContent = im.stem;
     t.onclick = e => { if (!e.target.closest('.x')) select(im); };
@@ -656,7 +716,7 @@ function renderStrip() {
     el.appendChild(t);
   }
   const add = document.createElement('button');
-  add.className = 'add-tile'; add.textContent = '+ Add';
+  add.className = 'add-tile'; add.textContent = '+ add more';
   add.onclick = () => $('file').click();
   el.appendChild(add);
   renderCounts();
@@ -678,7 +738,9 @@ function renderCounts() {
   const has = S.images.length > 0;
   $('save').disabled = $('copy').disabled = !S.cur;
   $('saveAll').disabled = !has;
-  $('saveAll').textContent = S.images.length > 1 ? `Download all (${S.images.length})` : 'Download all';
+  $('saveAll').textContent = S.images.length > 1 ? `save all (${S.images.length})` : 'save all';
+  const hiddenTotal = S.images.reduce((n, im) => n + countOn(im), 0);
+  $('objects').textContent = S.images.length ? `${S.images.length} screenshot${S.images.length > 1 ? 's' : ''} · ${hiddenTotal} hidden` : 'no screenshots';
   $('undo').disabled = !S.undo.length;
 }
 
@@ -776,7 +838,7 @@ function saveBlob(blob, name) {
 
 async function waitForMatches() {
   if (!S.pending) return;
-  setStatus('Finishing matches before export…', 'progress');
+  setStatus('finishing up matches…', 'progress');
   await idle();
 }
 
@@ -800,17 +862,17 @@ async function downloadAll() {
   await waitForMatches();
   const names = exportNames();
   if (window.JSZip) {
-    setStatus('Building zip…');
+    setStatus('zipping…');
     const zip = new JSZip();
     for (let i = 0; i < S.images.length; i++) zip.file(names[i], await renderBlob(S.images[i]));
     saveBlob(await zip.generateAsync({ type: 'blob' }), 'censored-screenshots.zip');
-    toast(`Saved ${S.images.length} screenshots as a zip`);
+    toast(`saved ${S.images.length} screenshots as a zip`);
   } else {
     for (let i = 0; i < S.images.length; i++) {
       saveBlob(await renderBlob(S.images[i]), names[i]);
       await new Promise(r => setTimeout(r, 300));
     }
-    toast(`Saved ${S.images.length} screenshots`);
+    toast(`saved ${S.images.length} screenshots`);
   }
 }
 
@@ -819,8 +881,8 @@ async function copyCurrent() {
   try {
     await waitForMatches();
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': renderBlob(S.cur) })]);
-    toast('Copied. Paste it into Discord.');
-  } catch { toast("Your browser blocked copying. Use Download instead.", 3000); }
+    toast('copied. paste it anywhere.');
+  } catch { toast("your browser blocked copying. use save instead.", 3000); }
 }
 
 let toastTimer;
@@ -860,7 +922,7 @@ for (const id of ['style', 'color', 'pad', 'outlines']) $(id).addEventListener('
 $('style').addEventListener('input', () => { $('color').style.display = $('style').value === 'solid' ? '' : 'none'; });
 $('remember').addEventListener('change', () => {
   saveLook();
-  if ($('remember').checked) { saveSamples(); toast('Saved on this device'); }
+  if ($('remember').checked) { saveSamples(); toast('saved on this device'); }
   else storeSet(STORE.samples, null);
 });
 
