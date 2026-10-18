@@ -126,7 +126,9 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
 .tile .meta{display:flex;justify-content:space-between;gap:4px;font-size:11px;color:var(--dim);margin-top:2px;line-height:1.25}
 .tile .meta span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
 .tile .x{position:absolute;top:6px;right:6px;opacity:0}
-.tile:hover .x,.tile .x:focus-visible{opacity:1}
+.tile:hover .x,.tile .x:focus-visible,.tile:focus-within .x{opacity:1}
+@media (hover:none){.tile .x{opacity:1}}
+.tile:focus-visible,.person:focus-visible{outline:2px solid var(--pink);outline-offset:1px}
 .add-tile{flex:none;width:92px;min-height:74px;border:1px dashed var(--btn-line);border-radius:2px;background:transparent;color:var(--dim)}
 
 .statusbar{flex:none;display:flex;gap:10px;align-items:center;padding:3px 10px;font-size:11px;color:var(--dim);background:var(--face);border-top:1px solid var(--line)}
@@ -137,8 +139,8 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
 @media (max-width:760px){
   body{padding:0}
   .window{border-radius:0;border:0}
-  main{grid-template-columns:1fr;grid-template-rows:minmax(65vh,1fr) auto;overflow:auto}
-  .tasks{order:0;border-right:0;border-top:1px solid var(--line)}
+  main{grid-template-columns:1fr;grid-template-rows:65vh auto;overflow:auto}
+  .tasks{order:0;overflow:visible;border-right:0;border-top:1px solid var(--line)}
   #right{min-height:65vh}
   .titlebar h1 span,.peek,.commands .sep{display:none}
   .statusbar .cell:not(:first-child){display:none}
@@ -175,9 +177,9 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
     <input id="file" type="file" accept="image/*" multiple hidden>
     <span class="sep"></span>
     <div class="seg" id="mode">
-      <button data-mode="match" class="on" title="shortcut: M">hide every copy</button>
-      <button data-mode="box" title="shortcut: B">single box</button>
-      <button data-mode="crop" title="shortcut: C">crop</button>
+      <button data-mode="match" class="on" aria-pressed="true" title="shortcut: M">hide every copy</button>
+      <button data-mode="box" aria-pressed="false" title="shortcut: B">single box</button>
+      <button data-mode="crop" aria-pressed="false" title="shortcut: C">crop</button>
     </div>
     <button id="uncrop" hidden>uncrop</button>
     <span class="hint peek">hold <kbd>space</kbd> to peek</span>
@@ -281,7 +283,7 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
     <span class="end"><a href="https://milly.works4you.dev/" target="_blank" rel="noopener">milly.works4you.dev</a></span>
   </div>
 </div>
-<div id="status" class="balloon"></div>
+<div id="status" class="balloon" role="status" aria-live="polite"></div>
 
 <script id="workerSrc" type="text/plain">
 const imgs = new Map();
@@ -471,7 +473,7 @@ const $ = id => document.getElementById(id);
 const base = $('base'), over = $('overlay'), bctx = base.getContext('2d'), octx = over.getContext('2d');
 const COLORS = ['#e56aa5', '#9a7fe0', '#4a90e2', '#3fae2a', '#f0a030', '#1aa6b7', '#d1418a', '#7b5cd6'];
 const BOX_COLOR = '#9aa0a6';
-const STORE = { legacy: 'namecensor.samples.v1', data: 'namecensor.data.v2', look: 'namecensor.look.v1' };
+const STORE = { legacy: 'namecensor.samples.v1', data: 'namecensor.data.v2', look: 'namecensor.look.v1', hints: 'namecensor.hints.off' };
 const SCALED_SLACK = 0.03;
 const NAME_FONT = '"gg sans","Noto Sans","Segoe UI",Helvetica,Arial,sans-serif';
 const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
@@ -486,6 +488,7 @@ const POOL = Array.from({ length: Math.min(4, Math.max(1, (navigator.hardwareCon
 
 const S = { images: [], cur: null, samples: [], people: [], active: null, mode: 'match', zoom: 'fit', peek: false,
   undo: [], drag: null, pending: 0, waiters: [], focus: -1, hintsOff: false };
+S.hintsOff = !!storeGet(STORE.hints);
 let nextId = 1;
 const uid = () => nextId++;
 
@@ -570,11 +573,11 @@ function removeImage(im) {
   const i = S.images.indexOf(im);
   if (i < 0) return;
   S.images.splice(i, 1);
-  im.worker.postMessage({ type: 'drop', id: im.id });
-  URL.revokeObjectURL(im.url);
-  S.undo = S.undo.filter(u => u.image !== im);
-  if (S.cur === im) { S.cur = S.images[Math.min(i, S.images.length - 1)] || null; S.focus = -1; }
+  const wasCur = S.cur === im;
+  if (wasCur) { S.cur = S.images[Math.min(i, S.images.length - 1)] || null; S.focus = -1; }
+  pushUndo({ undo: () => { S.images.splice(Math.min(i, S.images.length), 0, im); if (wasCur || !S.cur) select(im); } });
   renderAll();
+  toast('screenshot removed. ctrl+z brings it back.', 2000);
 }
 
 function select(im) {
@@ -635,7 +638,8 @@ function trim(im, r) {
       if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
     }
   }
-  if (x1 < 0 || x1 - x0 < 2 || y1 - y0 < 2) return r;
+  if (x1 < 0) return null;
+  if (x1 - x0 < 2 || y1 - y0 < 2) return r;
   x0 = Math.max(0, x0 - 1); y0 = Math.max(0, y0 - 1); x1 = Math.min(w - 1, x1 + 1); y1 = Math.min(h - 1, y1 + 1);
   return { x: r.x + x0, y: r.y + y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
@@ -668,6 +672,7 @@ function removeSample(s, undoable = true) {
 function sampleFromSelection(im, r) {
   ensurePeople();
   r = trim(im, r);
+  if (!r) { toast("nothing to hide in that box. drag over the name or avatar.", 2500); drawOverlay(); return null; }
   const data = im.ctx.getImageData(r.x, r.y, r.w, r.h).data;
   const kind = guessKind(r.w, r.h);
   const n = S.samples.filter(s => s.kind === kind).length + 1;
@@ -692,13 +697,14 @@ async function restoreData() {
   if (saved && Array.isArray(saved.people)) {
     const ids = new Map();
     for (const p of saved.people) {
+      if (!p || typeof p !== 'object') continue;
       const np = { id: uid(), name: String(p.name ?? 'me'), alias: String(p.alias ?? ''), color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : COLORS[0] };
       ids.set(p.id, np.id);
       S.people.push(np);
     }
     S.active = ids.get(saved.active) ?? null;
     ensurePeople();
-    for (const o of saved.samples || []) { try { S.samples.push(await loadSample(o, ids.get(o.personId) ?? S.people[0].id)); } catch {} }
+    for (const o of Array.isArray(saved.samples) ? saved.samples : []) { try { S.samples.push(await loadSample(o, ids.get(o.personId) ?? S.people[0].id)); } catch {} }
     return;
   }
   const legacy = storeGet(STORE.legacy);
@@ -967,6 +973,7 @@ function renderPeople() {
     const d = document.createElement('div');
     d.className = 'person' + (p.id === S.active ? ' on' : '');
     d.dataset.id = p.id;
+    d.tabIndex = 0; d.setAttribute('role', 'button'); d.setAttribute('aria-pressed', String(p.id === S.active));
     d.title = 'new boxes go to the highlighted person';
     d.innerHTML = `<span class="dot"></span><input type="text" aria-label="person name"><input type="text" class="alias" aria-label="alias" placeholder="alias"><button class="x" title="remove person">×</button>`;
     d.querySelector('.dot').style.background = p.color;
@@ -977,8 +984,10 @@ function renderPeople() {
     for (const i of [name, alias]) i.onkeydown = e => { if (e.key === 'Enter' || e.key === 'Escape') i.blur(); };
     d.onclick = e => {
       if (e.target.closest('.x') || S.active === p.id) return;
-      S.active = p.id; saveData(); renderPeople();
+      S.active = p.id; saveData();
+      for (const row of el.children) { const on = row.dataset.id === String(p.id); row.classList.toggle('on', on); row.setAttribute('aria-pressed', String(on)); }
     };
+    d.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === d) { e.preventDefault(); e.stopPropagation(); d.click(); } };
     const x = d.querySelector('.x');
     x.disabled = S.people.length < 2;
     x.onclick = () => removePerson(p);
@@ -1062,6 +1071,8 @@ function renderStrip() {
     t.className = 'tile' + (im === S.cur ? ' on' : ''); t.dataset.id = im.id;
     t.title = `${im.stem} (drag to reorder)`;
     t.draggable = true;
+    t.tabIndex = 0; t.setAttribute('role', 'button'); t.setAttribute('aria-label', 'show ' + im.stem); t.setAttribute('aria-pressed', String(im === S.cur));
+    t.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === t) { e.preventDefault(); e.stopPropagation(); select(im); } };
     t.innerHTML = `<img alt="" draggable="false"><div class="meta"><span></span><span class="n"></span></div><button class="x" title="remove screenshot">×</button>`;
     t.querySelector('img').src = im.url;
     t.querySelector('.meta span').textContent = im.stem;
@@ -1241,11 +1252,13 @@ async function waitForMatches() {
 }
 
 function exportNames() {
-  const used = new Map();
+  const used = new Set();
   return S.images.map(im => {
     if (!$('plainNames').checked) {
-      const n = used.get(im.stem) || 0; used.set(im.stem, n + 1);
-      return `${im.stem}${n ? '-' + (n + 1) : ''}-censored.png`;
+      let n = 1, name;
+      do name = `${im.stem}${n > 1 ? '-' + n : ''}-censored.png`; while (used.has(name.toLowerCase()) && ++n);
+      used.add(name.toLowerCase());
+      return name;
     }
     return `censored-${String(S.images.indexOf(im) + 1).padStart(2, '0')}.png`;
   });
@@ -1417,8 +1430,10 @@ function timeRuns(words) {
     }
     cur = [];
   };
-  for (const w of words) {
-    const kind = timeToken((w.text || '').trim());
+  const last = words.length - 1;
+  for (const [i, w] of words.entries()) {
+    const text = (w.text || '').trim();
+    const kind = i === last && words.length <= 4 && /^([01]?\d|2[0-3])[0-5]\d$/.test(text) ? 'strong' : timeToken(text);
     if (kind) cur.push({ ...w, kind }); else flush();
   }
   flush();
@@ -1520,7 +1535,7 @@ function toast(text, ms = 2000) {
 
 function setMode(m) {
   S.mode = m;
-  for (const b of $('mode').children) b.classList.toggle('on', b.dataset.mode === m);
+  for (const b of $('mode').children) { b.classList.toggle('on', b.dataset.mode === m); b.setAttribute('aria-pressed', String(b.dataset.mode === m)); }
   renderBanner();
   drawOverlay();
 }
@@ -1550,7 +1565,7 @@ $('remember').addEventListener('change', () => {
 });
 
 $('undo').onclick = undo;
-$('bannerClose').onclick = () => { S.hintsOff = true; renderBanner(); };
+$('bannerClose').onclick = () => { S.hintsOff = true; storeSet(STORE.hints, true); renderBanner(); };
 $('save').onclick = downloadCurrent;
 $('saveAll').onclick = downloadAll;
 $('stitchBtn').onclick = stitch;
@@ -1578,13 +1593,14 @@ window.addEventListener('drop', e => {
   if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
 });
 
-const typing = e => e.target.closest?.('input[type=text], textarea, select');
+const typing = e => e.target.closest?.('input:not([type=checkbox]):not([type=radio]), textarea, select');
+const onControl = e => e.target.closest?.('button, input, select, a, [role=button]');
 window.addEventListener('keydown', e => {
   if (typing(e)) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key === ' ' && S.cur) { e.preventDefault(); if (!S.peek) { S.peek = true; renderStage(); } return; }
-  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+  if (e.key === ' ' && S.cur && !onControl(e)) { e.preventDefault(); if (!S.peek) { S.peek = true; renderStage(); } return; }
+  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && !e.target.closest?.('input, select')) {
     const i = S.images.indexOf(S.cur), j = i + (e.key === 'ArrowRight' ? 1 : -1);
     if (S.images[j]) { e.preventDefault(); select(S.images[j]); }
     return;
