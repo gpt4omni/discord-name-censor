@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Screenshot Name Censor</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235865f2'/%3E%3Crect x='7' y='12' width='18' height='8' rx='2' fill='%23000'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+<style>
+:root{
+  --bg:#f2f3f5;--panel:#ffffff;--text:#1e1f22;--muted:#5c5e66;--border:#d7d9de;
+  --accent:#5865f2;--accent-text:#ffffff;--danger:#da373c;--stage:#e3e5e8;--input:#ebedef;--hover:#e0e1e5;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#1e1f22;--panel:#2b2d31;--text:#f2f3f5;--muted:#b5bac1;--border:#3f4147;
+    --stage:#111214;--input:#1e1f22;--hover:#35373c}
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+button,.btn{font:inherit;border:1px solid var(--border);background:var(--input);color:var(--text);
+  padding:6px 12px;border-radius:6px;cursor:pointer;white-space:nowrap}
+button:hover:not(:disabled),.btn:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+kbd{font:12px ui-monospace,monospace;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--input)}
+
+header{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel);flex-wrap:wrap}
+header h1{font-size:16px;margin:0 auto 0 0;font-weight:650}
+
+main{flex:1;min-height:0;display:grid;grid-template-columns:310px 1fr}
+aside{background:var(--panel);border-right:1px solid var(--border);padding:16px;overflow:auto;display:flex;flex-direction:column;gap:20px}
+aside h2{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 8px}
+.hint{color:var(--muted);font-size:13px;margin:0}
+.hint b{color:var(--text);font-weight:600}
+
+#samples{display:flex;flex-direction:column;gap:8px}
+.sample{border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.sample .top{display:flex;align-items:center;gap:8px}
+.sample .thumb{flex:none;width:44px;height:30px;border-radius:4px;border:2px solid;display:grid;place-items:center;overflow:hidden;background:#000}
+.sample .thumb img{max-width:100%;max-height:100%;image-rendering:pixelated}
+.sample input[type=text]{flex:1;min-width:0;font:inherit;font-weight:600;background:transparent;color:var(--text);border:1px solid transparent;border-radius:4px;padding:2px 4px}
+.sample input[type=text]:hover,.sample input[type=text]:focus{border-color:var(--border);outline:none}
+.sample .count{color:var(--muted);font-size:12px;white-space:nowrap}
+.x{padding:0 7px;line-height:20px;color:var(--muted)}
+.x:hover:not(:disabled){color:var(--danger);border-color:var(--danger)}
+.sample .thr{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--muted)}
+.sample .thr span{width:34px;text-align:right}
+.empty-list{color:var(--muted);font-size:13px;border:1px dashed var(--border);border-radius:8px;padding:10px}
+
+.row{display:flex;align-items:center;gap:8px;margin:8px 0}
+.row label{flex:1;color:var(--muted)}
+select,input[type=color]{font:inherit;background:var(--input);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px}
+input[type=color]{width:40px;height:30px;padding:2px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+details ol{padding-left:18px;margin:8px 0 0}
+details li{margin:4px 0}
+
+#right{display:flex;flex-direction:column;min-width:0;min-height:0}
+#toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--panel);flex-wrap:wrap}
+.seg{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:var(--input)}
+.seg button.on{background:var(--accent);color:var(--accent-text)}
+#toolbar .spacer{flex:1}
+#zoomPct{width:44px;text-align:center;color:var(--muted);font-size:12px}
+#toolbar .peek{color:var(--muted);font-size:12px}
+
+#stage{position:relative;flex:1;min-width:0;min-height:0;overflow:auto;background:var(--stage);display:flex}
+#drop{margin:auto;padding:48px 32px;border:2px dashed var(--border);border-radius:12px;text-align:center;max-width:460px;color:var(--muted)}
+#drop strong{display:block;color:var(--text);font-size:17px;margin-bottom:8px}
+#drop button{margin-top:16px}
+#wrap{position:relative;margin:auto;display:none;line-height:0;padding:16px 0}
+#wrap canvas{display:block;width:100%}
+#overlay{position:absolute;left:0;top:16px;height:calc(100% - 32px);cursor:crosshair;touch-action:none}
+#stageBox{position:relative;flex:1;min-height:0;display:flex}
+#banner{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:none;z-index:2;max-width:calc(100% - 32px);text-align:center;
+  background:var(--accent);color:var(--accent-text);padding:8px 16px;border-radius:999px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.3);pointer-events:none}
+body.dragging #stage::after{content:"Drop images to add them";position:absolute;inset:8px;border:3px dashed var(--accent);border-radius:12px;
+  display:grid;place-items:center;font-size:18px;font-weight:600;color:var(--text);background:color-mix(in srgb,var(--stage) 80%,transparent);pointer-events:none}
+
+#strip{display:none;gap:8px;padding:8px 12px;border-top:1px solid var(--border);background:var(--panel);overflow-x:auto;flex:none}
+.tile{position:relative;flex:none;width:96px;cursor:pointer;border:2px solid transparent;border-radius:8px;padding:3px;background:var(--input)}
+.tile.on{border-color:var(--accent)}
+.tile img{display:block;width:100%;height:56px;object-fit:cover;object-position:top;border-radius:5px}
+.tile .meta{display:flex;justify-content:space-between;gap:4px;font-size:11px;color:var(--muted);margin-top:3px;line-height:1.2}
+.tile .meta span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile .x{position:absolute;top:6px;right:6px;padding:0 5px;line-height:16px;font-size:12px;background:var(--panel);opacity:0}
+.tile:hover .x{opacity:1}
+.add-tile{flex:none;width:96px;border:2px dashed var(--border);border-radius:8px;display:grid;place-items:center;color:var(--muted);cursor:pointer;font-size:13px;background:transparent}
+
+#status{position:fixed;bottom:16px;right:16px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 12px;display:none;box-shadow:0 4px 16px rgba(0,0,0,.25);z-index:5}
+
+@media (max-width:760px){
+  main{grid-template-columns:1fr;grid-template-rows:auto minmax(70vh,1fr)}
+  aside{border-right:0;border-bottom:1px solid var(--border);order:2}
+  #right{order:1;min-height:70vh}
+  header h1{font-size:15px;width:100%}
+  #toolbar .peek{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Screenshot Name Censor</h1>
+  <button id="addBtn">Add images</button>
+  <button id="copy" disabled title="Copy current image">Copy</button>
+  <button id="save" disabled>Download</button>
+  <button id="saveAll" class="primary" disabled>Download all</button>
+  <input id="file" type="file" accept="image/*" multiple hidden>
+</header>
+<main>
+  <aside>
+    <section>
+      <h2>Things to hide</h2>
+      <p class="hint" style="margin-bottom:10px">Each one is hidden in <b>every</b> screenshot you add, now or later.</p>
+      <div id="samples"></div>
+    </section>
+    <section>
+      <h2>Look</h2>
+      <div class="row"><label for="style">Style</label>
+        <select id="style">
+          <option value="solid">Solid block</option>
+          <option value="pixel">Pixelate</option>
+          <option value="blur">Blur</option>
+        </select>
+        <input type="color" id="color" value="#000000" title="Block color">
+      </div>
+      <div class="row"><label for="pad">Padding</label><input type="range" id="pad" min="0" max="12" value="2" style="width:130px"></div>
+      <div class="row"><label for="outlines">Show outlines while editing</label><input type="checkbox" id="outlines" checked></div>
+      <p class="hint">Solid block is the safe choice. Blurred or pixelated text can sometimes be read back.</p>
+    </section>
+    <section>
+      <div class="row" style="margin:0"><label for="remember">Remember my things to hide on this device</label><input type="checkbox" id="remember"></div>
+      <p class="hint">Next time, new screenshots get censored as soon as you add them.</p>
+    </section>
+    <details>
+      <summary>How it works</summary>
+      <ol class="hint">
+        <li>Add one or more screenshots: drop, paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>, or pick files.</li>
+        <li>Drag a box around <b>your name</b>. Every identical copy, in every screenshot, gets covered.</li>
+        <li>Do the same for <b>your avatar</b>, and for the <b>small name and avatar</b> in reply lines.</li>
+        <li><b>Click</b> a box to switch a single match off or on. Lower a slider if some copies were missed.</li>
+        <li>Hold <kbd>Space</kbd> to peek at the original. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes. <kbd>←</kbd> <kbd>→</kbd> switch screenshots.</li>
+      </ol>
+      <p class="hint" style="margin-top:8px">Matching needs the same Discord zoom level. A screenshot taken at a different zoom needs its own boxes.</p>
+      <p class="hint" style="margin-top:8px">Nothing is uploaded. All processing stays in your browser.</p>
+    </details>
+  </aside>
+  <div id="right">
+    <div id="toolbar">
+      <div class="seg" id="mode">
+        <button data-mode="match" class="on" title="Shortcut: M">Hide all copies</button>
+        <button data-mode="box" title="Shortcut: B">Single box</button>
+      </div>
+      <span class="peek">Hold <kbd>Space</kbd> to peek</span>
+      <div class="spacer"></div>
+      <button id="undo" disabled title="Ctrl+Z">Undo</button>
+      <button id="zoomOut" title="Zoom out">−</button>
+      <span id="zoomPct">100%</span>
+      <button id="zoomIn" title="Zoom in">+</button>
+      <button id="zoomFit">Fit</button>
+    </div>
+    <div id="stageBox">
+    <div id="banner"></div>
+    <div id="stage">
+      <div id="drop">
+        <strong>Drop screenshots here</strong>
+        Or paste with Ctrl+V. Add as many as you like; whatever you hide in one is hidden in all of them.
+        <br><button class="primary" id="pickBtn">Choose images</button>
+      </div>
+      <div id="wrap">
+        <canvas id="base"></canvas>
+        <canvas id="overlay"></canvas>
+      </div>
+    </div>
+    </div>
+    <div id="strip"></div>
+  </div>
+</main>
+<div id="status"></div>
+
+<script id="workerSrc" type="text/plain">
+const imgs = new Map();
+onmessage = e => {
+  const m = e.data;
+  if (m.type === 'image') { imgs.set(m.id, { D: m.data, W: m.w, H: m.h, cache: new Map() }); return; }
+  if (m.type === 'drop') { imgs.delete(m.id); return; }
+  const im = imgs.get(m.imageId);
+  let matches = [], error = null;
+  try { if (im) matches = findAll(im, m.tpl, m.tw, m.th, m.origin); }
+  catch (err) { error = String(err && err.message || err); }
+  postMessage({ imageId: m.imageId, sampleId: m.sampleId, matches, error });
+};
+
+function down(D, W, H, s) {
+  const w = Math.floor(W / s), h = Math.floor(H / s), a = new Float32Array(w * h * 3), k = 1 / (s * s);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let r = 0, g = 0, b = 0;
+    for (let j = 0; j < s; j++) {
+      let p = ((y * s + j) * W + x * s) * 4;
+      for (let i = 0; i < s; i++, p += 4) { r += D[p]; g += D[p + 1]; b += D[p + 2]; }
+    }
+    const o = (y * w + x) * 3; a[o] = r * k; a[o + 1] = g * k; a[o + 2] = b * k;
+  }
+  return { a, w, h };
+}
+
+function level(im, s) {
+  if (im.cache.has(s)) return im.cache.get(s);
+  const L = down(im.D, im.W, im.H, s), { a, w, h } = L, iw = w + 1, size = iw * (h + 1);
+  const S0 = new Float64Array(size), S1 = new Float64Array(size), S2 = new Float64Array(size), Q = new Float64Array(size);
+  for (let y = 0; y < h; y++) {
+    let r0 = 0, r1 = 0, r2 = 0, rq = 0;
+    for (let x = 0; x < w; x++) {
+      const p = (y * w + x) * 3, r = a[p], g = a[p + 1], b = a[p + 2];
+      r0 += r; r1 += g; r2 += b; rq += r * r + g * g + b * b;
+      const o = (y + 1) * iw + x + 1, u = y * iw + x + 1;
+      S0[o] = S0[u] + r0; S1[o] = S1[u] + r1; S2[o] = S2[u] + r2; Q[o] = Q[u] + rq;
+    }
+  }
+  Object.assign(L, { S0, S1, S2, Q, iw });
+  im.cache.set(s, L);
+  return L;
+}
+
+function zeroMean(T, n) {
+  const mean = [0, 0, 0];
+  for (let p = 0; p < n * 3; p++) mean[p % 3] += T[p];
+  let tn = 0;
+  for (let p = 0; p < n * 3; p++) { T[p] -= mean[p % 3] / n; tn += T[p] * T[p]; }
+  return Math.sqrt(tn);
+}
+
+function scoreMap(L, T, tn, tW, tH) {
+  const { a, w, h, S0, S1, S2, Q, iw } = L, n = tW * tH;
+  const rect = (A, x, y) => A[(y + tH) * iw + x + tW] - A[y * iw + x + tW] - A[(y + tH) * iw + x] + A[y * iw + x];
+  const ow = w - tW + 1, oh = h - tH + 1, out = new Float32Array(Math.max(0, ow * oh)), rowLen = tW * 3;
+  for (let y = 0; y < oh; y++) for (let x = 0; x < ow; x++) {
+    const s0 = rect(S0, x, y), s1 = rect(S1, x, y), s2 = rect(S2, x, y);
+    const v = rect(Q, x, y) - (s0 * s0 + s1 * s1 + s2 * s2) / n;
+    if (v <= 1e-3) continue;
+    let dot = 0;
+    for (let j = 0; j < tH; j++) {
+      const ip = ((y + j) * w + x) * 3, tp = j * rowLen;
+      for (let k = 0; k < rowLen; k++) dot += a[ip + k] * T[tp + k];
+    }
+    out[y * ow + x] = dot / (tn * Math.sqrt(v));
+  }
+  return { out, ow, oh };
+}
+
+function nccAt(im, T, tn, tw, th, x, y) {
+  const { D, W, H } = im;
+  if (x < 0 || y < 0 || x + tw > W || y + th > H) return -1;
+  const n = tw * th;
+  let s0 = 0, s1 = 0, s2 = 0, q = 0, dot = 0;
+  for (let j = 0; j < th; j++) {
+    let p = ((y + j) * W + x) * 4, t = j * tw * 3;
+    for (let i = 0; i < tw; i++, p += 4, t += 3) {
+      const r = D[p], g = D[p + 1], b = D[p + 2];
+      dot += r * T[t] + g * T[t + 1] + b * T[t + 2];
+      s0 += r; s1 += g; s2 += b; q += r * r + g * g + b * b;
+    }
+  }
+  const v = q - (s0 * s0 + s1 * s1 + s2 * s2) / n;
+  return v > 1e-3 ? dot / (tn * Math.sqrt(v)) : 0;
+}
+
+function overlaps(a, b, w, h) {
+  const ix = Math.max(0, Math.min(a.x, b.x) + w - Math.max(a.x, b.x));
+  const iy = Math.max(0, Math.min(a.y, b.y) + h - Math.max(a.y, b.y));
+  return ix * iy > 0.3 * w * h;
+}
+
+function nms(list, w, h, limit) {
+  list.sort((a, b) => b.score - a.score);
+  const kept = [];
+  for (const c of list) {
+    if (kept.length >= limit) break;
+    if (!kept.some(k => overlaps(k, c, w, h))) kept.push(c);
+  }
+  return kept;
+}
+
+function findAll(im, tpl, tw, th, origin) {
+  if (tw > im.W || th > im.H) return [];
+  const maxS = Math.max(1, Math.min(Math.floor(tw / 4), Math.floor(th / 4)));
+  let s = 1;
+  while (s < maxS && ((im.W * im.H * tw * th) / s ** 4 > 1.5e8 || (tw * th) / (s * s) > 600)) s++;
+
+  const T = new Float32Array(tw * th * 3);
+  for (let p = 0, t = 0; p < tw * th * 4; p += 4, t += 3) { T[t] = tpl[p]; T[t + 1] = tpl[p + 1]; T[t + 2] = tpl[p + 2]; }
+  const tn = zeroMean(T, tw * th);
+  if (tn < 1e-3) return origin ? [{ x: origin.x, y: origin.y, score: 1 }] : [];
+
+  const L = level(im, s), floor = s === 1 ? 0.5 : 0.35, coarse = [];
+  for (let qy = 0; qy < s; qy++) for (let qx = 0; qx < s; qx++) {
+    const cw = tw - qx, ch = th - qy, crop = new Uint8ClampedArray(cw * ch * 4);
+    for (let j = 0; j < ch; j++) crop.set(tpl.subarray(((j + qy) * tw + qx) * 4, ((j + qy) * tw + tw) * 4), j * cw * 4);
+    const C = down(crop, cw, ch, s), tW = C.w, tH = C.h;
+    const ctn = zeroMean(C.a, tW * tH);
+    if (ctn < 1e-3 || tW > L.w || tH > L.h) continue;
+    const map = scoreMap(L, C.a, ctn, tW, tH);
+    for (let j = 0; j < map.oh; j++) for (let i = 0; i < map.ow; i++) {
+      const v = map.out[j * map.ow + i];
+      if (v >= floor) coarse.push({ x: i * s - qx, y: j * s - qy, score: v });
+    }
+  }
+  let found = nms(coarse, tw, th, 600);
+  if (s > 1) {
+    found = found.map(c => {
+      let best = { x: c.x, y: c.y, score: -1 };
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const v = nccAt(im, T, tn, tw, th, c.x + dx, c.y + dy);
+        if (v > best.score) best = { x: c.x + dx, y: c.y + dy, score: v };
+      }
+      return best;
+    }).filter(c => c.score >= 0.5);
+    found = nms(found, tw, th, 600);
+  }
+  if (origin && !found.some(c => overlaps(c, origin, tw, th))) found.push({ x: origin.x, y: origin.y, score: 1 });
+  return found.map(c => ({ x: c.x, y: c.y, score: Math.round(c.score * 1000) / 1000 }));
+}
+</script>
+
+<script>
+const $ = id => document.getElementById(id);
+const base = $('base'), over = $('overlay'), bctx = base.getContext('2d'), octx = over.getContext('2d');
+const COLORS = ['#5865f2', '#23a55a', '#f0b232', '#eb459e', '#00a8fc', '#f47b67', '#a970ff', '#3ba55c'];
+const BOX_COLOR = '#9aa0a6';
+const STORE = { samples: 'namecensor.samples.v1', look: 'namecensor.look.v1' };
+
+const workerUrl = URL.createObjectURL(new Blob([$('workerSrc').textContent], { type: 'text/javascript' }));
+const POOL = Array.from({ length: Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 2) - 1)) }, () => {
+  const w = new Worker(workerUrl);
+  w.onmessage = onResult;
+  w.onerror = e => toast('Match search failed: ' + e.message, 4000);
+  return w;
+});
+
+const S = { images: [], cur: null, samples: [], mode: 'match', zoom: 'fit', peek: false, undo: [], drag: null, pending: 0, waiters: [] };
+let nextId = 1;
+const uid = () => nextId++;
+
+function storeGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
+function storeSet(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+function look() {
+  return { style: $('style').value, color: $('color').value, pad: +$('pad').value, outlines: $('outlines').checked, remember: $('remember').checked };
+}
+function saveLook() { storeSet(STORE.look, look()); }
+function saveSamples() {
+  if (!$('remember').checked) return;
+  storeSet(STORE.samples, S.samples.map(s => ({ label: s.label, color: s.color, w: s.w, h: s.h, thr: s.thr, png: s.thumb })));
+}
+
+async function decode(file) {
+  const url = URL.createObjectURL(file);
+  const el = new Image();
+  el.src = url;
+  await el.decode();
+  const w = el.naturalWidth, h = el.naturalHeight;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(el, 0, 0);
+  const id = uid(), worker = POOL[id % POOL.length];
+  const data = ctx.getImageData(0, 0, w, h).data;
+  worker.postMessage({ type: 'image', id, data, w, h }, [data.buffer]);
+  const named = file.name && file.name !== 'image.png';
+  const stem = named ? file.name.replace(/\.[^.]+$/, '') : `screenshot-${S.images.length + 1}`;
+  return { id, stem, el, url, w, h, ctx, worker, results: new Map(), off: new Set(), boxes: [] };
+}
+
+async function addFiles(files) {
+  const list = [...files].filter(f => f.type.startsWith('image/'));
+  if (!list.length) { toast('No images in that'); return; }
+  let first = null;
+  for (const f of list) {
+    try {
+      const im = await decode(f);
+      S.images.push(im);
+      first ??= im;
+      for (const s of S.samples) runMatch(im, s);
+    } catch { toast(`Couldn't open ${f.name || 'image'}`); }
+  }
+  if (first) select(first);
+  if (list.length > 1) toast(`Added ${list.length} screenshots`);
+}
+
+function removeImage(im) {
+  const i = S.images.indexOf(im);
+  if (i < 0) return;
+  S.images.splice(i, 1);
+  im.worker.postMessage({ type: 'drop', id: im.id });
+  URL.revokeObjectURL(im.url);
+  S.undo = S.undo.filter(u => u.image !== im);
+  if (S.cur === im) S.cur = S.images[Math.min(i, S.images.length - 1)] || null;
+  renderAll();
+}
+
+function select(im) {
+  S.cur = im;
+  renderAll();
+  const tile = document.querySelector(`.tile[data-id="${im.id}"]`);
+  tile?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function runMatch(im, s) {
+  if (s.w > im.w || s.h > im.h) { im.results.set(s.id, []); return; }
+  im.results.set(s.id, null);
+  S.pending++;
+  const origin = s.origin && s.origin.imageId === im.id ? { x: s.origin.x, y: s.origin.y } : null;
+  im.worker.postMessage({ type: 'match', imageId: im.id, sampleId: s.id, tpl: s.data, tw: s.w, th: s.h, origin });
+  showProgress();
+}
+
+function onResult(e) {
+  const { imageId, sampleId, matches, error } = e.data;
+  S.pending--;
+  if (error) toast('Search failed for one screenshot: ' + error, 4000);
+  const im = S.images.find(i => i.id === imageId);
+  if (im && S.samples.some(s => s.id === sampleId) && im.results.has(sampleId)) {
+    im.results.set(sampleId, matches);
+    if (im === S.cur) renderStage();
+  }
+  renderCounts();
+  showProgress();
+  if (!S.pending) { S.waiters.splice(0).forEach(r => r()); }
+}
+
+function idle() { return S.pending ? new Promise(r => S.waiters.push(r)) : Promise.resolve(); }
+
+function showProgress() {
+  if (S.pending) setStatus(`Finding matches… ${S.pending} left`);
+  else if ($('status').dataset.kind === 'progress') setStatus('');
+}
+
+function trim(im, r) {
+  const d = im.ctx.getImageData(r.x, r.y, r.w, r.h).data, w = r.w, h = r.h;
+  const counts = new Map();
+  const border = (x, y) => { const p = (y * w + x) * 4, k = (d[p] >> 3) << 10 | (d[p + 1] >> 3) << 5 | d[p + 2] >> 3; counts.set(k, (counts.get(k) || 0) + 1); };
+  for (let x = 0; x < w; x++) { border(x, 0); border(x, h - 1); }
+  for (let y = 0; y < h; y++) { border(0, y); border(w - 1, y); }
+  let bgKey = 0, best = -1;
+  for (const [k, c] of counts) if (c > best) { best = c; bgKey = k; }
+  const br = (bgKey >> 10 & 31) << 3, bg = (bgKey >> 5 & 31) << 3, bb = (bgKey & 31) << 3;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const p = (y * w + x) * 4;
+    if (Math.abs(d[p] - br) + Math.abs(d[p + 1] - bg) + Math.abs(d[p + 2] - bb) > 40) {
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+  }
+  if (x1 < 0 || x1 - x0 < 2 || y1 - y0 < 2) return r;
+  x0 = Math.max(0, x0 - 1); y0 = Math.max(0, y0 - 1); x1 = Math.min(w - 1, x1 + 1); y1 = Math.min(h - 1, y1 + 1);
+  return { x: r.x + x0, y: r.y + y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+function pngOf(data, w, h) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
+  return c.toDataURL('image/png');
+}
+
+function freeColor() {
+  const used = new Set(S.samples.map(s => s.color));
+  return COLORS.find(c => !used.has(c)) || COLORS[S.samples.length % COLORS.length];
+}
+
+function addSample(s, index = S.samples.length) {
+  S.samples.splice(index, 0, s);
+  for (const im of S.images) runMatch(im, s);
+  saveSamples();
+  renderAll();
+}
+
+function removeSample(s, undoable = true) {
+  const i = S.samples.indexOf(s);
+  if (i < 0) return;
+  S.samples.splice(i, 1);
+  for (const im of S.images) im.results.delete(s.id);
+  if (undoable) pushUndo({ label: `remove ${s.label}`, undo: () => addSample(s, i) });
+  saveSamples();
+  renderAll();
+}
+
+function sampleFromSelection(im, r) {
+  r = trim(im, r);
+  const data = im.ctx.getImageData(r.x, r.y, r.w, r.h).data;
+  const n = S.samples.length + 1;
+  const s = { id: uid(), label: `Item ${n}`, color: freeColor(), w: r.w, h: r.h, data, thr: 0.97,
+    origin: { imageId: im.id, x: r.x, y: r.y }, thumb: pngOf(data, r.w, r.h) };
+  addSample(s);
+  pushUndo({ label: 'add', undo: () => removeSample(s, false) });
+}
+
+async function restoreSamples() {
+  const saved = storeGet(STORE.samples);
+  if (!Array.isArray(saved)) return;
+  for (const o of saved) {
+    try {
+      const el = new Image(); el.src = o.png; await el.decode();
+      const c = document.createElement('canvas'); c.width = o.w; c.height = o.h;
+      const ctx = c.getContext('2d', { willReadFrequently: true }); ctx.drawImage(el, 0, 0);
+      S.samples.push({ id: uid(), label: o.label, color: o.color, w: o.w, h: o.h, thr: o.thr,
+        data: ctx.getImageData(0, 0, o.w, o.h).data, origin: null, thumb: o.png });
+    } catch {}
+  }
+}
+
+function regions(im) {
+  const out = [];
+  for (const s of S.samples) {
+    const res = im.results.get(s.id);
+    if (!res) continue;
+    for (const m of res) if (m.score >= s.thr) {
+      const key = `${s.id}:${m.x}:${m.y}`;
+      out.push({ x: m.x, y: m.y, w: s.w, h: s.h, key, on: !im.off.has(key), color: s.color });
+    }
+  }
+  for (const b of im.boxes) out.push({ x: b.x, y: b.y, w: b.w, h: b.h, box: b, on: true, color: BOX_COLOR });
+  return out;
+}
+
+function padRect(r, im) {
+  const p = +$('pad').value;
+  const x = Math.max(0, r.x - p), y = Math.max(0, r.y - p);
+  return { x, y, w: Math.min(im.w, r.x + r.w + p) - x, h: Math.min(im.h, r.y + r.h + p) - y };
+}
+
+function isPending(im) { return S.samples.some(s => im.results.get(s.id) === null); }
+function countOn(im) { return regions(im).filter(r => r.on).length; }
+
+function censor(ctx, src, r) {
+  const style = $('style').value;
+  if (style === 'solid') { ctx.fillStyle = $('color').value; ctx.fillRect(r.x, r.y, r.w, r.h); return; }
+  if (style === 'blur' && 'filter' in ctx) {
+    const rad = Math.max(4, Math.round(Math.min(r.w, r.h) / 3)), m = rad * 2;
+    ctx.save(); ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h); ctx.clip();
+    ctx.filter = `blur(${rad}px)`;
+    ctx.drawImage(src, r.x - m, r.y - m, r.w + 2 * m, r.h + 2 * m, r.x - m, r.y - m, r.w + 2 * m, r.h + 2 * m);
+    ctx.restore(); return;
+  }
+  const b = Math.max(5, Math.round(Math.min(r.w, r.h) / 3));
+  const t = document.createElement('canvas'); t.width = Math.max(1, Math.ceil(r.w / b)); t.height = Math.max(1, Math.ceil(r.h / b));
+  t.getContext('2d').drawImage(src, r.x, r.y, r.w, r.h, 0, 0, t.width, t.height);
+  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(t, 0, 0, t.width, t.height, r.x, r.y, r.w, r.h); ctx.restore();
+}
+
+function paint(ctx, im, peek) {
+  ctx.drawImage(im.el, 0, 0);
+  if (!peek) for (const r of regions(im)) if (r.on) censor(ctx, im.el, padRect(r, im));
+}
+
+function zoomFactor() {
+  const im = S.cur;
+  if (!im) return 1;
+  if (S.zoom !== 'fit') return S.zoom;
+  const st = $('stage');
+  return Math.max(0.1, Math.min(2, (st.clientWidth - 32) / im.w));
+}
+
+function renderStage() {
+  const im = S.cur;
+  $('drop').style.display = im ? 'none' : '';
+  $('wrap').style.display = im ? 'block' : 'none';
+  if (!im) { renderBanner(); return; }
+  if (base.width !== im.w || base.height !== im.h) { base.width = over.width = im.w; base.height = over.height = im.h; }
+  const z = zoomFactor();
+  $('wrap').style.width = Math.round(im.w * z) + 'px';
+  over.style.width = '100%';
+  $('zoomPct').textContent = Math.round(z * 100) + '%';
+  paint(bctx, im, S.peek);
+  drawOverlay();
+  renderBanner();
+}
+
+function drawOverlay() {
+  const im = S.cur;
+  octx.clearRect(0, 0, over.width, over.height);
+  if (!im) return;
+  const k = im.w / (over.getBoundingClientRect().width || im.w);
+  octx.lineWidth = 2 * k;
+  if ($('outlines').checked && !S.peek) for (const r of regions(im)) {
+    const p = padRect(r, im);
+    octx.strokeStyle = r.color;
+    octx.setLineDash(r.on ? [] : [4 * k, 3 * k]);
+    octx.globalAlpha = r.on ? 1 : 0.8;
+    octx.strokeRect(p.x, p.y, p.w, p.h);
+  }
+  octx.globalAlpha = 1;
+  if (S.drag && S.drag.moved) {
+    const r = dragRect(S.drag);
+    octx.setLineDash([5 * k, 4 * k]); octx.strokeStyle = '#ffffff'; octx.strokeRect(r.x, r.y, r.w, r.h);
+    octx.lineDashOffset = 5 * k; octx.strokeStyle = '#000000'; octx.strokeRect(r.x, r.y, r.w, r.h);
+    octx.lineDashOffset = 0;
+  }
+  octx.setLineDash([]);
+}
+
+function renderBanner() {
+  const b = $('banner');
+  let text = '';
+  if (S.cur && !S.samples.length && !S.cur.boxes.length) text = 'Drag a box around your name to hide it everywhere';
+  else if (S.cur && S.samples.length === 1 && S.samples[0].origin && S.mode === 'match' && S.undo.length <= 1) text = 'Nice. Now drag around your avatar';
+  b.textContent = text;
+  b.style.display = text ? 'block' : 'none';
+}
+
+function renderSamples() {
+  const el = $('samples');
+  if (!S.samples.length) {
+    el.innerHTML = `<div class="empty-list">${S.images.length ? 'Drag a box around your name on the screenshot.' : 'Add a screenshot, then drag a box around your name.'}</div>`;
+    return;
+  }
+  el.innerHTML = '';
+  for (const s of S.samples) {
+    const d = document.createElement('div');
+    d.className = 'sample'; d.dataset.id = s.id;
+    d.innerHTML = `<div class="top">
+        <span class="thumb" style="border-color:${s.color}"><img alt=""></span>
+        <input type="text" aria-label="Name">
+        <span class="count"></span>
+        <button class="x" title="Remove">×</button>
+      </div>
+      <div class="thr"><label>Similarity</label><input type="range" min="50" max="100" step="1"><span></span></div>`;
+    d.querySelector('img').src = s.thumb;
+    const name = d.querySelector('input[type=text]');
+    name.value = s.label;
+    name.oninput = () => { s.label = name.value || 'Item'; saveSamples(); };
+    name.onkeydown = e => { if (e.key === 'Enter' || e.key === 'Escape') name.blur(); };
+    const range = d.querySelector('input[type=range]'), pct = d.querySelector('.thr span');
+    range.value = Math.round(s.thr * 100); pct.textContent = range.value + '%';
+    range.oninput = () => { s.thr = range.value / 100; pct.textContent = range.value + '%'; renderStage(); renderCounts(); };
+    range.onchange = saveSamples;
+    d.querySelector('.x').onclick = () => removeSample(s);
+    el.appendChild(d);
+  }
+  renderCounts();
+}
+
+function renderStrip() {
+  const el = $('strip');
+  el.style.display = S.images.length ? 'flex' : 'none';
+  el.innerHTML = '';
+  for (const im of S.images) {
+    const t = document.createElement('div');
+    t.className = 'tile' + (im === S.cur ? ' on' : ''); t.dataset.id = im.id;
+    t.title = im.stem;
+    t.innerHTML = `<img alt=""><div class="meta"><span></span><span class="n"></span></div><button class="x" title="Remove screenshot">×</button>`;
+    t.querySelector('img').src = im.url;
+    t.querySelector('.meta span').textContent = im.stem;
+    t.onclick = e => { if (!e.target.closest('.x')) select(im); };
+    t.querySelector('.x').onclick = () => removeImage(im);
+    el.appendChild(t);
+  }
+  const add = document.createElement('button');
+  add.className = 'add-tile'; add.textContent = '+ Add';
+  add.onclick = () => $('file').click();
+  el.appendChild(add);
+  renderCounts();
+}
+
+function renderCounts() {
+  for (const s of S.samples) {
+    const c = document.querySelector(`.sample[data-id="${s.id}"] .count`);
+    if (!c) continue;
+    const busy = S.images.some(im => im.results.get(s.id) === null);
+    let n = 0;
+    for (const im of S.images) for (const r of regions(im)) if (r.key?.startsWith(s.id + ':') && r.on) n++;
+    c.textContent = busy ? 'searching…' : `${n} hidden`;
+  }
+  for (const im of S.images) {
+    const c = document.querySelector(`.tile[data-id="${im.id}"] .n`);
+    if (c) c.textContent = isPending(im) ? '…' : `${countOn(im)} hidden`;
+  }
+  const has = S.images.length > 0;
+  $('save').disabled = $('copy').disabled = !S.cur;
+  $('saveAll').disabled = !has;
+  $('saveAll').textContent = S.images.length > 1 ? `Download all (${S.images.length})` : 'Download all';
+  $('undo').disabled = !S.undo.length;
+}
+
+function renderAll() { renderStage(); renderSamples(); renderStrip(); }
+
+function pushUndo(u) { S.undo.push(u); if (S.undo.length > 100) S.undo.shift(); renderCounts(); }
+function undo() {
+  const u = S.undo.pop();
+  if (!u) return;
+  u.undo();
+  renderAll();
+}
+
+function toImage(e) {
+  const r = over.getBoundingClientRect();
+  return {
+    x: Math.round((e.clientX - r.left) * S.cur.w / r.width),
+    y: Math.round((e.clientY - r.top) * S.cur.h / r.height),
+  };
+}
+
+function dragRect(d) {
+  const im = S.cur;
+  const x0 = Math.max(0, Math.min(d.a.x, d.b.x)), y0 = Math.max(0, Math.min(d.a.y, d.b.y));
+  const x1 = Math.min(im.w, Math.max(d.a.x, d.b.x)), y1 = Math.min(im.h, Math.max(d.a.y, d.b.y));
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+function hit(p) {
+  const im = S.cur, rs = regions(im);
+  for (let i = rs.length - 1; i >= 0; i--) {
+    const q = padRect(rs[i], im);
+    if (p.x >= q.x && p.y >= q.y && p.x <= q.x + q.w && p.y <= q.y + q.h) return rs[i];
+  }
+  return null;
+}
+
+over.addEventListener('pointerdown', e => {
+  if (!S.cur || e.button !== 0) return;
+  over.setPointerCapture(e.pointerId);
+  const p = toImage(e);
+  S.drag = { a: p, b: p, moved: false };
+});
+over.addEventListener('pointermove', e => {
+  if (!S.cur) return;
+  const p = toImage(e);
+  if (!S.drag) { over.style.cursor = hit(p) ? 'pointer' : 'crosshair'; return; }
+  S.drag.b = p;
+  if (Math.abs(p.x - S.drag.a.x) + Math.abs(p.y - S.drag.a.y) > 4) S.drag.moved = true;
+  drawOverlay();
+});
+over.addEventListener('pointerup', () => {
+  const d = S.drag;
+  S.drag = null;
+  if (!d) return;
+  if (!d.moved) { toggleAt(d.a); return; }
+  const r = dragRect(d);
+  if (r.w < 3 || r.h < 3) { drawOverlay(); return; }
+  if (S.mode === 'box') {
+    const im = S.cur;
+    im.boxes.push(r);
+    pushUndo({ image: im, undo: () => { im.boxes = im.boxes.filter(b => b !== r); } });
+    renderStage(); renderCounts();
+  } else sampleFromSelection(S.cur, r);
+});
+over.addEventListener('pointercancel', () => { S.drag = null; drawOverlay(); });
+
+function toggleAt(p) {
+  const im = S.cur, r = hit(p);
+  if (!r) return;
+  if (r.box) {
+    const i = im.boxes.indexOf(r.box);
+    im.boxes.splice(i, 1);
+    pushUndo({ image: im, undo: () => im.boxes.splice(i, 0, r.box) });
+  } else {
+    const flip = () => im.off.has(r.key) ? im.off.delete(r.key) : im.off.add(r.key);
+    flip();
+    pushUndo({ image: im, undo: flip });
+  }
+  renderStage(); renderCounts();
+}
+
+async function renderBlob(im) {
+  const c = document.createElement('canvas'); c.width = im.w; c.height = im.h;
+  paint(c.getContext('2d'), im, false);
+  return new Promise(r => c.toBlob(r, 'image/png'));
+}
+
+function saveBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+async function waitForMatches() {
+  if (!S.pending) return;
+  setStatus('Finishing matches before export…', 'progress');
+  await idle();
+}
+
+function exportNames() {
+  const used = new Map();
+  return S.images.map(im => {
+    const n = used.get(im.stem) || 0; used.set(im.stem, n + 1);
+    return `${im.stem}${n ? '-' + (n + 1) : ''}-censored.png`;
+  });
+}
+
+async function downloadCurrent() {
+  if (!S.cur) return;
+  await waitForMatches();
+  saveBlob(await renderBlob(S.cur), exportNames()[S.images.indexOf(S.cur)]);
+}
+
+async function downloadAll() {
+  if (!S.images.length) return;
+  if (S.images.length === 1) return downloadCurrent();
+  await waitForMatches();
+  const names = exportNames();
+  if (window.JSZip) {
+    setStatus('Building zip…');
+    const zip = new JSZip();
+    for (let i = 0; i < S.images.length; i++) zip.file(names[i], await renderBlob(S.images[i]));
+    saveBlob(await zip.generateAsync({ type: 'blob' }), 'censored-screenshots.zip');
+    toast(`Saved ${S.images.length} screenshots as a zip`);
+  } else {
+    for (let i = 0; i < S.images.length; i++) {
+      saveBlob(await renderBlob(S.images[i]), names[i]);
+      await new Promise(r => setTimeout(r, 300));
+    }
+    toast(`Saved ${S.images.length} screenshots`);
+  }
+}
+
+async function copyCurrent() {
+  if (!S.cur) return;
+  try {
+    await waitForMatches();
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': renderBlob(S.cur) })]);
+    toast('Copied. Paste it into Discord.');
+  } catch { toast("Your browser blocked copying. Use Download instead.", 3000); }
+}
+
+let toastTimer;
+function setStatus(text, kind = 'progress') {
+  const el = $('status');
+  el.textContent = text; el.dataset.kind = text ? kind : '';
+  el.style.display = text ? 'block' : 'none';
+}
+function toast(text, ms = 2000) {
+  clearTimeout(toastTimer);
+  setStatus(text, 'toast');
+  toastTimer = setTimeout(() => { if ($('status').dataset.kind === 'toast') setStatus(''); showProgress(); }, ms);
+}
+
+function setMode(m) {
+  S.mode = m;
+  for (const b of $('mode').children) b.classList.toggle('on', b.dataset.mode === m);
+  renderBanner();
+}
+$('mode').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
+
+function setZoom(z) {
+  S.zoom = z === 'fit' ? 'fit' : Math.max(0.1, Math.min(8, z));
+  renderStage();
+}
+$('zoomIn').onclick = () => setZoom(zoomFactor() * 1.25);
+$('zoomOut').onclick = () => setZoom(zoomFactor() / 1.25);
+$('zoomFit').onclick = () => setZoom('fit');
+$('stage').addEventListener('wheel', e => {
+  if (!e.ctrlKey || !S.cur) return;
+  e.preventDefault();
+  setZoom(zoomFactor() * (e.deltaY < 0 ? 1.1 : 1 / 1.1));
+}, { passive: false });
+new ResizeObserver(() => { if (S.zoom === 'fit') renderStage(); else drawOverlay(); }).observe($('stage'));
+
+for (const id of ['style', 'color', 'pad', 'outlines']) $(id).addEventListener('input', () => { renderStage(); saveLook(); });
+$('style').addEventListener('input', () => { $('color').style.display = $('style').value === 'solid' ? '' : 'none'; });
+$('remember').addEventListener('change', () => {
+  saveLook();
+  if ($('remember').checked) { saveSamples(); toast('Saved on this device'); }
+  else storeSet(STORE.samples, null);
+});
+
+$('undo').onclick = undo;
+$('save').onclick = downloadCurrent;
+$('saveAll').onclick = downloadAll;
+$('copy').onclick = copyCurrent;
+$('addBtn').onclick = $('pickBtn').onclick = () => $('file').click();
+$('file').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+
+window.addEventListener('paste', e => {
+  const files = [...e.clipboardData.items].filter(i => i.type.startsWith('image/')).map(i => i.getAsFile());
+  if (files.length) { e.preventDefault(); addFiles(files); }
+});
+
+let dragDepth = 0;
+window.addEventListener('dragenter', e => { if (e.dataTransfer?.types.includes('Files')) { dragDepth++; document.body.classList.add('dragging'); } });
+window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+  e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
+  if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+});
+
+const typing = e => e.target.closest?.('input[type=text], textarea, select');
+window.addEventListener('keydown', e => {
+  if (typing(e)) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === ' ' && S.cur) { e.preventDefault(); if (!S.peek) { S.peek = true; renderStage(); } return; }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    const i = S.images.indexOf(S.cur), j = i + (e.key === 'ArrowRight' ? 1 : -1);
+    if (S.images[j]) { e.preventDefault(); select(S.images[j]); }
+    return;
+  }
+  if (e.key === 'm' || e.key === 'M') setMode('match');
+  if (e.key === 'b' || e.key === 'B') setMode('box');
+  if (e.key === 'Escape' && S.drag) { S.drag = null; drawOverlay(); }
+});
+window.addEventListener('keyup', e => { if (e.key === ' ' && S.peek) { e.preventDefault(); S.peek = false; renderStage(); } });
+window.addEventListener('blur', () => { if (S.peek) { S.peek = false; renderStage(); } });
+
+(async () => {
+  const l = storeGet(STORE.look);
+  if (l) {
+    if (['solid', 'pixel', 'blur'].includes(l.style)) $('style').value = l.style;
+    if (/^#[0-9a-f]{6}$/i.test(l.color)) $('color').value = l.color;
+    if (Number.isFinite(l.pad)) $('pad').value = l.pad;
+    $('outlines').checked = l.outlines !== false;
+    $('remember').checked = !!l.remember;
+  }
+  $('color').style.display = $('style').value === 'solid' ? '' : 'none';
+  if ($('remember').checked) await restoreSamples();
+  renderAll();
+})();
+</script>
+</body>
+</html>
