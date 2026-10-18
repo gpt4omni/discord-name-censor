@@ -109,7 +109,9 @@ input[type=checkbox]{accent-color:var(--pink-dark);width:13px;height:13px;margin
 #wrap canvas{display:block;width:100%}
 #overlay{position:absolute;left:0;top:16px;height:calc(100% - 32px);cursor:crosshair;touch-action:none}
 .balloon{background:var(--balloon);color:#000;border:1px solid #000;border-radius:7px;padding:6px 11px;box-shadow:2px 3px 6px rgba(0,0,0,.35);font:12px var(--ui)}
-#banner{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:none;z-index:2;max-width:calc(100% - 32px);text-align:center;pointer-events:none}
+#banner{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:none;z-index:2;max-width:calc(100% - 32px);padding-right:6px}
+#banner .in{display:flex;align-items:center;gap:10px}
+#banner button.x{flex:none;min-height:18px;background:#fff}
 body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;border:2px dashed var(--pink);border-radius:6px;
   display:grid;place-items:center;font:bold 16px var(--title-font);color:#fff;background:rgba(229,106,165,.18);pointer-events:none}
 
@@ -168,7 +170,7 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
   <main>
     <div id="right">
       <div id="stageBox">
-        <div id="banner" class="balloon"></div>
+        <div id="banner" class="balloon"><div class="in"><span id="bannerText"></span><button class="x" id="bannerClose" title="hide tips">×</button></div></div>
         <div id="stage">
           <div id="drop">
             <strong>drop screenshots here</strong>
@@ -216,7 +218,8 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
           <ol class="hint">
             <li>add screenshots: drop them in, paste with <kbd>ctrl</kbd>+<kbd>v</kbd>, or pick files.</li>
             <li>drag a box around <b>your name</b>. every copy in every screenshot gets covered.</li>
-            <li>do the same for <b>your avatar</b>, and the <b>small name and avatar</b> on reply lines.</li>
+            <li>do the same for <b>your avatar</b>.</li>
+              <li><b>don't skip replies:</b> drag around the small name and avatar on any reply lines too.</li>
             <li><b>click</b> a box to turn one match off or on. lower a slider if some copies got missed.</li>
             <li>hold <kbd>space</kbd> to see the original. <kbd>ctrl</kbd>+<kbd>z</kbd> undoes. <kbd>←</kbd> <kbd>→</kbd> switch screenshots.</li>
           </ol>
@@ -659,19 +662,25 @@ function drawOverlay() {
   octx.setLineDash([]);
 }
 
+const HINTS = [
+  'drag a box around your name to hide it everywhere',
+  'nice. now drag a box around your avatar',
+  'any replies? drag around the small name on a reply line too',
+  'and the small avatar next to it. then you\'re done',
+];
+
 function renderBanner() {
-  const b = $('banner');
+  const n = S.samples.length;
   let text = '';
-  if (S.cur && !S.samples.length && !S.cur.boxes.length) text = 'drag a box around your name to hide it everywhere';
-  else if (S.cur && S.samples.length === 1 && S.samples[0].origin && S.mode === 'match' && S.undo.length <= 1) text = 'nice. now drag a box around your avatar';
-  b.textContent = text;
-  b.style.display = text ? 'block' : 'none';
+  if (S.cur && !S.hintsOff && S.mode === 'match' && n < HINTS.length && S.samples.every(s => s.origin) && !(n === 0 && S.cur.boxes.length)) text = HINTS[n];
+  $('bannerText').textContent = text;
+  $('banner').style.display = text ? 'block' : 'none';
 }
 
 function renderSamples() {
   const el = $('samples');
   if (!S.samples.length) {
-    el.innerHTML = `<div class="empty-list">${S.images.length ? 'drag a box around your name on the screenshot.' : 'add a screenshot, then drag a box around your name.'}</div>`;
+    el.innerHTML = `<div class="empty-list">${S.images.length ? 'drag a box around your name, then your avatar. do the same for the small name and avatar on any replies.' : 'add a screenshot, then drag a box around your name, your avatar, and the small name and avatar on any replies.'}</div>`;
     return;
   }
   el.innerHTML = '';
@@ -927,6 +936,7 @@ $('remember').addEventListener('change', () => {
 });
 
 $('undo').onclick = undo;
+$('bannerClose').onclick = () => { S.hintsOff = true; renderBanner(); };
 $('save').onclick = downloadCurrent;
 $('saveAll').onclick = downloadAll;
 $('copy').onclick = copyCurrent;
