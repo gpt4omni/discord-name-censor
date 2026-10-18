@@ -8,13 +8,23 @@ Live at **https://censor.works4you.dev**. Everything runs in your browser. No im
 
 Go to https://censor.works4you.dev, or open `public/index.html` in any modern browser.
 
-1. Add screenshots: drop them on the page, paste with Ctrl+V, or click **Add images**. You can add as many as you like.
+1. Add screenshots: drop them on the page, paste with Ctrl+V, or click **add screenshots**. You can add as many as you like.
 2. Drag a box around your name on one message. Every identical copy in every screenshot is covered.
 3. Do the same for your avatar, and for the smaller name and avatar shown in reply lines.
-4. Click a box to switch a single match off or back on. If a copy was missed, lower that item's **Similarity** slider.
-5. Click **Download all** to get a zip of the censored screenshots, or **Download** / **Copy** for the one you are viewing.
+4. Click a box to switch a single match off or back on. If a copy was missed, lower that item's **similarity** slider.
+5. Click **save all** to get a zip of the censored screenshots, **save** / **copy** for the one you are viewing, or **stitch** to join them into one tall image.
 
-Tick **Remember my things to hide on this device** and new screenshots are censored as soon as you add them.
+Tick **remember people and things to hide on this device** and new screenshots are censored as soon as you add them.
+
+## Features
+
+- **Several people.** Add a person for each name you want hidden. New boxes go to the highlighted person.
+- **Aliases.** Give a person an alias and it is drawn where their name was, in the same colour and size. Their avatar becomes a coloured circle with the alias's first letter. When an alias is longer than the real name, the rest of the line slides over to make room.
+- **Find by typing.** Type a name and click **find**. Text recognition (tesseract.js) finds it in the screenshot and adds it.
+- **Crop.** Use the crop tool to trim a screenshot. Saving and stitching use the cropped area.
+- **Stitch.** Joins every screenshot, top to bottom, into one image and removes rows that overlap between consecutive screenshots. Drag the thumbnails to change the order.
+- **Other zoom levels.** Tick **also find other zoom levels** to match avatars and longer names in screenshots taken at a different Discord zoom.
+- **Install.** The site works as an installable app. On Android, the installed app shows up in the share menu, so you can send screenshots straight to it.
 
 ## Shortcuts
 
@@ -23,15 +33,17 @@ Tick **Remember my things to hide on this device** and new screenshots are censo
 | Hold Space | Show the original screenshot |
 | Ctrl+Z | Undo |
 | ← / → | Previous / next screenshot |
-| M / B | "Hide all copies" / "Single box" tool |
+| N / Shift+N | Next / previous match |
+| X | Switch the current match off or on |
+| M / B / C | "hide every copy" / "single box" / "crop" tool |
 | Ctrl+scroll | Zoom |
 
 ## Notes
 
-- Matching compares pixels, so screenshots must be taken at the same Discord zoom level as the one you marked. A screenshot at a different zoom needs its own boxes.
+- Matching compares pixels. Without **also find other zoom levels**, screenshots must be taken at the same Discord zoom as the one you marked.
 - JPEG screenshots and hover-highlighted messages still match.
 - **Solid block** is the safest style. Blurred or pixelated text can sometimes be recovered.
-- The zip download loads JSZip from cdnjs. Without it, each screenshot downloads as a separate file.
+- The zip download loads JSZip from cdnjs, and find by typing loads tesseract.js from jsDelivr the first time you use it.
 
 ## Deploy
 

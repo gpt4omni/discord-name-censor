@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>censor · hide your name in discord screenshots</title>
 <meta name="description" content="hide your name and avatar in discord screenshots before you share them. runs in your browser.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23e56aa5'/%3E%3Crect x='6' y='12' width='20' height='8' rx='1' fill='%231b1b1b'/%3E%3C/svg%3E">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#e56aa5">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
 <style>
 :root{
@@ -140,6 +143,21 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
   .titlebar h1 span,.peek,.commands .sep{display:none}
   .statusbar .cell:not(:first-child){display:none}
 }
+#people{display:flex;flex-direction:column;gap:3px;margin-bottom:6px}
+.person{display:grid;grid-template-columns:10px minmax(0,1fr) minmax(0,1.2fr) 19px;align-items:center;gap:4px;padding:3px 4px;border:1px solid transparent;border-radius:3px;cursor:pointer}
+.person:hover{background:#fff}
+.person.on{background:#fff;border-color:var(--line);box-shadow:inset 3px 0 0 var(--pink)}
+.person .dot{width:10px;height:10px;border-radius:50%}
+.person input{min-width:0;font:12px var(--ui);color:var(--text);border:1px solid transparent;background:transparent;padding:1px 3px}
+.person input:hover,.person input:focus{border-color:#7f9db9;background:#fff;outline:none}
+.person input.alias::placeholder{color:#a39fb0;font-style:italic}
+.small-btn{min-height:20px;padding:0 8px;font-size:11px}
+.sample .opts{display:flex;gap:4px;margin-top:5px}
+.sample .opts select{flex:1;min-width:0;font-size:11px;padding:1px}
+.find{display:flex;gap:4px;margin-top:8px}
+.find input{flex:1;min-width:0;font:12px var(--ui);border:1px solid #7f9db9;padding:2px 4px;background:#fff}
+.tile.drag-over{box-shadow:-3px 0 0 var(--pink)}
+.tile .crop-tag{position:absolute;left:6px;top:6px;font-size:10px;background:var(--pink);color:#fff;padding:0 4px;border-radius:2px}
 </style>
 </head>
 <body>
@@ -153,12 +171,15 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
     <button id="copy" disabled title="copy this screenshot">copy</button>
     <button id="save" disabled>save</button>
     <button id="saveAll" class="primary" disabled>save all</button>
+    <button id="stitchBtn" disabled title="join every screenshot into one tall image">stitch</button>
     <input id="file" type="file" accept="image/*" multiple hidden>
     <span class="sep"></span>
     <div class="seg" id="mode">
       <button data-mode="match" class="on" title="shortcut: M">hide every copy</button>
       <button data-mode="box" title="shortcut: B">single box</button>
+      <button data-mode="crop" title="shortcut: C">crop</button>
     </div>
+    <button id="uncrop" hidden>uncrop</button>
     <span class="hint peek">hold <kbd>space</kbd> to peek</span>
     <span class="spacer"></span>
     <button id="undo" disabled title="ctrl+z">undo</button>
@@ -187,8 +208,21 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
     </div>
     <aside class="tasks">
       <section class="pane">
+        <h2>people</h2>
+        <div class="body">
+          <div id="people"></div>
+          <button id="addPerson" class="small-btn">+ add person</button>
+          <label class="check" style="margin-top:8px"><input type="checkbox" id="room" checked><span>slide the rest of the line over when an alias is longer</span></label>
+          <p class="hint" style="margin-top:6px">new boxes go to the highlighted person. give someone an alias and it gets drawn where their name was. typing their real display name helps the alias come out the right size.</p>
+        </div>
+      </section>
+      <section class="pane">
         <h2>things to hide</h2>
-        <div class="body"><div id="samples"></div></div>
+        <div class="body">
+          <div id="samples"></div>
+          <div class="find"><input id="findName" type="text" placeholder="or type a name to find it" aria-label="name to find"><button id="findBtn" class="small-btn">find</button></div>
+          <label class="check" style="margin-top:8px"><input type="checkbox" id="scales"><span>also find other zoom levels (avatars and longer names, slower)</span></label>
+        </div>
       </section>
       <section class="pane">
         <h2>look</h2>
@@ -196,7 +230,7 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
           <div class="row"><label for="style">style</label>
             <select id="style">
               <option value="erase">erase (match background)</option>
-                <option value="solid">solid block</option>
+              <option value="solid">solid block</option>
               <option value="pixel">pixelate</option>
               <option value="blur">blur</option>
             </select>
@@ -210,7 +244,7 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
       <section class="pane">
         <h2>remember</h2>
         <div class="body">
-          <label class="check"><input type="checkbox" id="remember"><span>remember these on this device. new screenshots get censored the moment you add them.</span></label>
+          <label class="check"><input type="checkbox" id="remember"><span>remember people and things to hide on this device. new screenshots get censored the moment you add them.</span></label>
         </div>
       </section>
       <details class="pane">
@@ -220,11 +254,14 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
             <li>add screenshots: drop them in, paste with <kbd>ctrl</kbd>+<kbd>v</kbd>, or pick files.</li>
             <li>drag a box around <b>your name</b>. every copy in every screenshot gets covered.</li>
             <li>do the same for <b>your avatar</b>.</li>
-              <li><b>don't skip replies:</b> drag around the small name and avatar on any reply lines too.</li>
+            <li><b>don't skip replies:</b> drag around the small name and avatar on any reply lines too.</li>
+            <li>hiding someone else too? <b>add a person</b>, highlight them, then drag their name and avatar.</li>
             <li><b>click</b> a box to turn one match off or on. lower a slider if some copies got missed.</li>
-            <li>hold <kbd>space</kbd> to see the original. <kbd>ctrl</kbd>+<kbd>z</kbd> undoes. <kbd>←</kbd> <kbd>→</kbd> switch screenshots.</li>
+            <li><b>crop</b> trims a screenshot. <b>stitch</b> joins them all into one tall image and removes overlap.</li>
           </ol>
-          <p class="hint" style="margin-top:6px">matching needs the same discord zoom level. a screenshot at a different zoom needs its own boxes.</p>
+          <p class="hint" style="margin-top:6px"><b>keys:</b> hold <kbd>space</kbd> to see the original · <kbd>ctrl</kbd>+<kbd>z</kbd> undo · <kbd>←</kbd> <kbd>→</kbd> switch screenshots · <kbd>n</kbd> / <kbd>shift</kbd>+<kbd>n</kbd> step through matches · <kbd>x</kbd> turn the current match off or on · <kbd>m</kbd> <kbd>b</kbd> <kbd>c</kbd> tools</p>
+          <p class="hint" style="margin-top:6px">screenshots at a different discord zoom need their own boxes, or tick "also find other zoom levels".</p>
+          <p class="hint" style="margin-top:6px">on your phone, install this as an app and you can share screenshots straight into it.</p>
         </div>
       </details>
       <section class="pane">
@@ -246,16 +283,55 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
 
 <script id="workerSrc" type="text/plain">
 const imgs = new Map();
+const SCALES = [0.5, 0.67, 0.75, 0.8, 0.9, 1.1, 1.25, 1.5, 1.75, 2];
 onmessage = e => {
   const m = e.data;
   if (m.type === 'image') { imgs.set(m.id, { D: m.data, W: m.w, H: m.h, cache: new Map() }); return; }
   if (m.type === 'drop') { imgs.delete(m.id); return; }
   const im = imgs.get(m.imageId);
   let matches = [], error = null;
-  try { if (im) matches = findAll(im, m.tpl, m.tw, m.th, m.origin); }
+  try { if (im) matches = m.scales ? findScaled(im, m) : findAll(im, m.tpl, m.tw, m.th, m.origin); }
   catch (err) { error = String(err && err.message || err); }
   postMessage({ imageId: m.imageId, sampleId: m.sampleId, matches, error });
 };
+
+function resize(src, sw, sh, f) {
+  const w = Math.max(1, Math.round(sw * f)), h = Math.max(1, Math.round(sh * f)), out = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    const fy = Math.min(sh - 1, Math.max(0, (y + 0.5) / f - 0.5)), y0 = Math.floor(fy), y1 = Math.min(sh - 1, y0 + 1), ty = fy - y0;
+    for (let x = 0; x < w; x++) {
+      const fx = Math.min(sw - 1, Math.max(0, (x + 0.5) / f - 0.5)), x0 = Math.floor(fx), x1 = Math.min(sw - 1, x0 + 1), tx = fx - x0;
+      const a = (y0 * sw + x0) * 4, b = (y0 * sw + x1) * 4, c = (y1 * sw + x0) * 4, d = (y1 * sw + x1) * 4, o = (y * w + x) * 4;
+      for (let k = 0; k < 3; k++) {
+        out[o + k] = (src[a + k] * (1 - tx) + src[b + k] * tx) * (1 - ty) + (src[c + k] * (1 - tx) + src[d + k] * tx) * ty;
+      }
+      out[o + 3] = 255;
+    }
+  }
+  return { data: out, w, h };
+}
+
+function findScaled(im, m) {
+  const all = findAll(im, m.tpl, m.tw, m.th, m.origin).map(c => ({ ...c, w: m.tw, h: m.th }));
+  if (Math.min(m.tw, m.th) < 16) return all;
+  for (const f of SCALES) {
+    const r = resize(m.tpl, m.tw, m.th, f);
+    if (r.w < 5 || r.h < 5 || r.w > im.W || r.h > im.H) continue;
+    for (const c of findAll(im, r.data, r.w, r.h, null)) all.push({ ...c, w: r.w, h: r.h, scaled: true });
+  }
+  all.sort((a, b) => b.score - a.score);
+  const kept = [];
+  for (const c of all) {
+    if (kept.length >= 600) break;
+    const clash = kept.some(k => {
+      const ix = Math.max(0, Math.min(k.x + k.w, c.x + c.w) - Math.max(k.x, c.x));
+      const iy = Math.max(0, Math.min(k.y + k.h, c.y + c.h) - Math.max(k.y, c.y));
+      return ix * iy > 0.3 * Math.min(k.w * k.h, c.w * c.h);
+    });
+    if (!clash) kept.push(c);
+  }
+  return kept;
+}
 
 function down(D, W, H, s) {
   const w = Math.floor(W / s), h = Math.floor(H / s), a = new Float32Array(w * h * 3), k = 1 / (s * s);
@@ -393,7 +469,10 @@ const $ = id => document.getElementById(id);
 const base = $('base'), over = $('overlay'), bctx = base.getContext('2d'), octx = over.getContext('2d');
 const COLORS = ['#e56aa5', '#9a7fe0', '#4a90e2', '#3fae2a', '#f0a030', '#1aa6b7', '#d1418a', '#7b5cd6'];
 const BOX_COLOR = '#9aa0a6';
-const STORE = { samples: 'namecensor.samples.v1', look: 'namecensor.look.v1' };
+const STORE = { legacy: 'namecensor.samples.v1', data: 'namecensor.data.v2', look: 'namecensor.look.v1' };
+const SCALED_SLACK = 0.03;
+const NAME_FONT = '"gg sans","Noto Sans","Segoe UI",Helvetica,Arial,sans-serif';
+const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
 
 const workerUrl = URL.createObjectURL(new Blob([$('workerSrc').textContent], { type: 'text/javascript' }));
 const POOL = Array.from({ length: Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 2) - 1)) }, () => {
@@ -403,7 +482,8 @@ const POOL = Array.from({ length: Math.min(4, Math.max(1, (navigator.hardwareCon
   return w;
 });
 
-const S = { images: [], cur: null, samples: [], mode: 'match', zoom: 'fit', peek: false, undo: [], drag: null, pending: 0, waiters: [] };
+const S = { images: [], cur: null, samples: [], people: [], active: null, mode: 'match', zoom: 'fit', peek: false,
+  undo: [], drag: null, pending: 0, waiters: [], focus: -1, hintsOff: false };
 let nextId = 1;
 const uid = () => nextId++;
 
@@ -411,12 +491,44 @@ function storeGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch
 function storeSet(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
 function look() {
-  return { style: $('style').value, color: $('color').value, pad: +$('pad').value, outlines: $('outlines').checked, remember: $('remember').checked };
+  return { style: $('style').value, color: $('color').value, pad: +$('pad').value, outlines: $('outlines').checked,
+    remember: $('remember').checked, scales: $('scales').checked, room: $('room').checked };
 }
 function saveLook() { storeSet(STORE.look, look()); }
-function saveSamples() {
+function saveData() {
   if (!$('remember').checked) return;
-  storeSet(STORE.samples, S.samples.map(s => ({ label: s.label, color: s.color, w: s.w, h: s.h, thr: s.thr, png: s.thumb })));
+  storeSet(STORE.data, {
+    people: S.people.map(p => ({ id: p.id, name: p.name, alias: p.alias, color: p.color })),
+    active: S.active,
+    samples: S.samples.map(s => ({ label: s.label, personId: s.personId, kind: s.kind, textScale: s.textScale,
+      w: s.w, h: s.h, thr: s.thr, png: s.thumb })),
+  });
+}
+
+function ensurePeople() {
+  if (!S.people.length) S.people.push({ id: uid(), name: 'me', alias: '', color: COLORS[0] });
+  if (!S.people.some(p => p.id === S.active)) S.active = S.people[0].id;
+}
+function personOf(s) { return S.people.find(p => p.id === s.personId) || S.people[0]; }
+
+function addPerson() {
+  const used = new Set(S.people.map(p => p.color));
+  const p = { id: uid(), name: `person ${S.people.length + 1}`, alias: '', color: COLORS.find(c => !used.has(c)) || COLORS[S.people.length % COLORS.length] };
+  S.people.push(p);
+  S.active = p.id;
+  saveData();
+  renderAll();
+  document.querySelector(`.person[data-id="${p.id}"] input`)?.select();
+}
+
+function removePerson(p) {
+  if (S.people.length < 2) return;
+  S.people = S.people.filter(x => x !== p);
+  const fallback = S.people[0].id;
+  for (const s of S.samples) if (s.personId === p.id) s.personId = fallback;
+  if (S.active === p.id) S.active = fallback;
+  saveData();
+  renderAll();
 }
 
 async function decode(file) {
@@ -433,11 +545,11 @@ async function decode(file) {
   worker.postMessage({ type: 'image', id, data, w, h }, [data.buffer]);
   const named = file.name && file.name !== 'image.png';
   const stem = named ? file.name.replace(/\.[^.]+$/, '') : `screenshot-${S.images.length + 1}`;
-  return { id, stem, el, url, w, h, ctx, worker, results: new Map(), off: new Set(), boxes: [] };
+  return { id, stem, el, url, w, h, ctx, worker, results: new Map(), off: new Set(), boxes: [], crop: null, cache: new Map() };
 }
 
 async function addFiles(files) {
-  const list = [...files].filter(f => f.type.startsWith('image/'));
+  const list = [...files].filter(f => f && f.type.startsWith('image/'));
   if (!list.length) { toast('no images in that'); return; }
   let first = null;
   for (const f of list) {
@@ -459,15 +571,15 @@ function removeImage(im) {
   im.worker.postMessage({ type: 'drop', id: im.id });
   URL.revokeObjectURL(im.url);
   S.undo = S.undo.filter(u => u.image !== im);
-  if (S.cur === im) S.cur = S.images[Math.min(i, S.images.length - 1)] || null;
+  if (S.cur === im) { S.cur = S.images[Math.min(i, S.images.length - 1)] || null; S.focus = -1; }
   renderAll();
 }
 
 function select(im) {
+  if (S.cur !== im) S.focus = -1;
   S.cur = im;
   renderAll();
-  const tile = document.querySelector(`.tile[data-id="${im.id}"]`);
-  tile?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  document.querySelector(`.tile[data-id="${im.id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 function runMatch(im, s) {
@@ -475,8 +587,13 @@ function runMatch(im, s) {
   im.results.set(s.id, null);
   S.pending++;
   const origin = s.origin && s.origin.imageId === im.id ? { x: s.origin.x, y: s.origin.y } : null;
-  im.worker.postMessage({ type: 'match', imageId: im.id, sampleId: s.id, tpl: s.data, tw: s.w, th: s.h, origin });
+  im.worker.postMessage({ type: 'match', imageId: im.id, sampleId: s.id, tpl: s.data, tw: s.w, th: s.h, origin, scales: $('scales').checked });
   showProgress();
+}
+
+function rematchAll() {
+  for (const im of S.images) for (const s of S.samples) runMatch(im, s);
+  renderAll();
 }
 
 function onResult(e) {
@@ -490,7 +607,7 @@ function onResult(e) {
   }
   renderCounts();
   showProgress();
-  if (!S.pending) { S.waiters.splice(0).forEach(r => r()); }
+  if (!S.pending) S.waiters.splice(0).forEach(r => r());
 }
 
 function idle() { return S.pending ? new Promise(r => S.waiters.push(r)) : Promise.resolve(); }
@@ -527,15 +644,12 @@ function pngOf(data, w, h) {
   return c.toDataURL('image/png');
 }
 
-function freeColor() {
-  const used = new Set(S.samples.map(s => s.color));
-  return COLORS.find(c => !used.has(c)) || COLORS[S.samples.length % COLORS.length];
-}
+function guessKind(w, h) { return h >= 14 && Math.abs(w - h) <= Math.max(w, h) * 0.25 ? 'avatar' : 'name'; }
 
 function addSample(s, index = S.samples.length) {
   S.samples.splice(index, 0, s);
   for (const im of S.images) runMatch(im, s);
-  saveSamples();
+  saveData();
   renderAll();
 }
 
@@ -544,33 +658,51 @@ function removeSample(s, undoable = true) {
   if (i < 0) return;
   S.samples.splice(i, 1);
   for (const im of S.images) im.results.delete(s.id);
-  if (undoable) pushUndo({ label: `remove ${s.label}`, undo: () => addSample(s, i) });
-  saveSamples();
+  if (undoable) pushUndo({ undo: () => addSample(s, i) });
+  saveData();
   renderAll();
 }
 
 function sampleFromSelection(im, r) {
+  ensurePeople();
   r = trim(im, r);
   const data = im.ctx.getImageData(r.x, r.y, r.w, r.h).data;
-  const n = S.samples.length + 1;
-  const s = { id: uid(), label: `item ${n}`, color: freeColor(), w: r.w, h: r.h, data, thr: 0.97,
+  const kind = guessKind(r.w, r.h);
+  const n = S.samples.filter(s => s.kind === kind).length + 1;
+  const s = { id: uid(), label: `${kind} ${n}`, personId: S.active, kind, textScale: 1, w: r.w, h: r.h, data, thr: 0.97,
     origin: { imageId: im.id, x: r.x, y: r.y }, thumb: pngOf(data, r.w, r.h) };
   addSample(s);
-  pushUndo({ label: 'add', undo: () => removeSample(s, false) });
+  pushUndo({ undo: () => removeSample(s, false) });
+  return s;
 }
 
-async function restoreSamples() {
-  const saved = storeGet(STORE.samples);
-  if (!Array.isArray(saved)) return;
-  for (const o of saved) {
-    try {
-      const el = new Image(); el.src = o.png; await el.decode();
-      const c = document.createElement('canvas'); c.width = o.w; c.height = o.h;
-      const ctx = c.getContext('2d', { willReadFrequently: true }); ctx.drawImage(el, 0, 0);
-      S.samples.push({ id: uid(), label: o.label, color: o.color, w: o.w, h: o.h, thr: o.thr,
-        data: ctx.getImageData(0, 0, o.w, o.h).data, origin: null, thumb: o.png });
-    } catch {}
+async function loadSample(o, personId) {
+  const el = new Image(); el.src = o.png; await el.decode();
+  const c = document.createElement('canvas'); c.width = o.w; c.height = o.h;
+  const ctx = c.getContext('2d', { willReadFrequently: true }); ctx.drawImage(el, 0, 0);
+  return { id: uid(), label: o.label || 'item', personId, kind: ['name', 'avatar', 'other'].includes(o.kind) ? o.kind : guessKind(o.w, o.h),
+    textScale: Number.isFinite(o.textScale) ? o.textScale : 1, w: o.w, h: o.h, thr: o.thr ?? 0.97,
+    data: ctx.getImageData(0, 0, o.w, o.h).data, origin: null, thumb: o.png };
+}
+
+async function restoreData() {
+  const saved = storeGet(STORE.data);
+  if (saved && Array.isArray(saved.people)) {
+    const ids = new Map();
+    for (const p of saved.people) {
+      const np = { id: uid(), name: String(p.name ?? 'me'), alias: String(p.alias ?? ''), color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : COLORS[0] };
+      ids.set(p.id, np.id);
+      S.people.push(np);
+    }
+    S.active = ids.get(saved.active) ?? null;
+    ensurePeople();
+    for (const o of saved.samples || []) { try { S.samples.push(await loadSample(o, ids.get(o.personId) ?? S.people[0].id)); } catch {} }
+    return;
   }
+  const legacy = storeGet(STORE.legacy);
+  if (!Array.isArray(legacy)) return;
+  ensurePeople();
+  for (const o of legacy) { try { S.samples.push(await loadSample(o, S.people[0].id)); } catch {} }
 }
 
 function regions(im) {
@@ -578,14 +710,18 @@ function regions(im) {
   for (const s of S.samples) {
     const res = im.results.get(s.id);
     if (!res) continue;
-    for (const m of res) if (m.score >= s.thr) {
-      const key = `${s.id}:${m.x}:${m.y}`;
-      out.push({ x: m.x, y: m.y, w: s.w, h: s.h, key, on: !im.off.has(key), color: s.color });
+    const color = personOf(s)?.color || COLORS[0];
+    for (const m of res) {
+      if (m.score < (m.scaled ? s.thr - SCALED_SLACK : s.thr)) continue;
+      const w = m.w || s.w, h = m.h || s.h, key = `${s.id}:${m.x}:${m.y}:${w}`;
+      out.push({ x: m.x, y: m.y, w, h, key, on: !im.off.has(key), color, sample: s });
     }
   }
   for (const b of im.boxes) out.push({ x: b.x, y: b.y, w: b.w, h: b.h, box: b, on: true, color: BOX_COLOR });
   return out;
 }
+
+function reviewList(im) { return regions(im).sort((a, b) => a.y - b.y || a.x - b.x); }
 
 function padRect(r, im) {
   const p = +$('pad').value;
@@ -596,19 +732,44 @@ function padRect(r, im) {
 function isPending(im) { return S.samples.some(s => im.results.get(s.id) === null); }
 function countOn(im) { return regions(im).filter(r => r.on).length; }
 
+function cached(im, key, fn) {
+  if (!im.cache.has(key)) im.cache.set(key, fn());
+  return im.cache.get(key);
+}
+
 function backgroundAround(im, r) {
-  const m = 2, x0 = Math.max(0, r.x - m), y0 = Math.max(0, r.y - m);
-  const x1 = Math.min(im.w, r.x + r.w + m), y1 = Math.min(im.h, r.y + r.h + m), w = x1 - x0, h = y1 - y0;
-  const d = im.ctx.getImageData(x0, y0, w, h).data, counts = new Map();
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const ix = x0 + x, iy = y0 + y;
-    if (ix >= r.x && ix < r.x + r.w && iy >= r.y && iy < r.y + r.h) continue;
-    const p = (y * w + x) * 4, k = d[p] << 16 | d[p + 1] << 8 | d[p + 2];
-    counts.set(k, (counts.get(k) || 0) + 1);
-  }
-  let best = 0, key = 0;
-  for (const [k, c] of counts) if (c > best) { best = c; key = k; }
-  return best ? '#' + key.toString(16).padStart(6, '0') : '#000000';
+  return cached(im, `bg:${r.x},${r.y},${r.w},${r.h}`, () => {
+    const m = 2, x0 = Math.max(0, r.x - m), y0 = Math.max(0, r.y - m);
+    const x1 = Math.min(im.w, r.x + r.w + m), y1 = Math.min(im.h, r.y + r.h + m), w = x1 - x0, h = y1 - y0;
+    const d = im.ctx.getImageData(x0, y0, w, h).data, counts = new Map();
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const ix = x0 + x, iy = y0 + y;
+      if (ix >= r.x && ix < r.x + r.w && iy >= r.y && iy < r.y + r.h) continue;
+      const p = (y * w + x) * 4, k = d[p] << 16 | d[p + 1] << 8 | d[p + 2];
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+    let best = 0, key = 0;
+    for (const [k, c] of counts) if (c > best) { best = c; key = k; }
+    return best ? '#' + key.toString(16).padStart(6, '0') : '#000000';
+  });
+}
+
+function inkColor(im, r) {
+  return cached(im, `ink:${r.x},${r.y},${r.w},${r.h}`, () => {
+    const bgHex = parseInt(backgroundAround(im, r).slice(1), 16), br = bgHex >> 16 & 255, bgc = bgHex >> 8 & 255, bb = bgHex & 255;
+    const d = im.ctx.getImageData(r.x, r.y, r.w, r.h).data, buckets = new Map();
+    for (let p = 0; p < d.length; p += 4) {
+      if (Math.abs(d[p] - br) + Math.abs(d[p + 1] - bgc) + Math.abs(d[p + 2] - bb) < 90) continue;
+      const k = (d[p] >> 4) << 8 | (d[p + 1] >> 4) << 4 | d[p + 2] >> 4;
+      const b = buckets.get(k) || { n: 0, r: 0, g: 0, b: 0 };
+      b.n++; b.r += d[p]; b.g += d[p + 1]; b.b += d[p + 2];
+      buckets.set(k, b);
+    }
+    let top = null;
+    for (const b of buckets.values()) if (!top || b.n > top.n) top = b;
+    if (!top) return '#ffffff';
+    return `rgb(${Math.round(top.r / top.n)},${Math.round(top.g / top.n)},${Math.round(top.b / top.n)})`;
+  });
 }
 
 function censor(ctx, im, r) {
@@ -628,23 +789,103 @@ function censor(ctx, im, r) {
   ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(t, 0, 0, t.width, t.height, r.x, r.y, r.w, r.h); ctx.restore();
 }
 
+function aliasText(r) {
+  const s = r.sample, p = s && personOf(s), text = p?.alias.trim();
+  return text && s.kind !== 'other' ? { s, p, text } : null;
+}
+
+function drawAvatarAlias(ctx, r, p, text) {
+  const d = Math.min(r.w, r.h), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  ctx.save();
+  ctx.fillStyle = p.color;
+  ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.round(d * 0.5)}px ${NAME_FONT}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText([...text][0].toUpperCase(), cx, cy + d * 0.03);
+  ctx.restore();
+}
+
+function nameLayout(ctx, im, r, s, p, text) {
+  ctx.save();
+  ctx.font = `600 100px ${NAME_FONT}`;
+  const ref = p.name.trim() && ctx.measureText(p.name.trim());
+  const refH = ref ? ref.actualBoundingBoxAscent + ref.actualBoundingBoxDescent : 0;
+  const fits = refH > 0 && Math.abs((ref.width * r.h) / refH - r.w) < r.w * 0.35;
+  const size = Math.max(6, (fits ? (r.h * 100) / refH : r.h / 0.8) * (s.textScale || 1));
+  const font = `600 ${size.toFixed(1)}px ${NAME_FONT}`;
+  ctx.font = font;
+  const m = ctx.measureText(text);
+  ctx.restore();
+  const y = fits ? r.y + r.h - (ref.actualBoundingBoxDescent * r.h) / refH : r.y + r.h / 2 + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+  return { font, y, width: m.width, gap: Math.max(2, size * 0.3) };
+}
+
+function makeRoom(ctx, im, r, need) {
+  const pad = Math.round(r.h * 0.2), y0 = Math.max(0, r.y - pad), y1 = Math.min(im.h, r.y + r.h + pad), h = y1 - y0;
+  const x0 = r.x + r.w, w = im.w - x0 - need;
+  if (w <= 0 || h <= 0) return;
+  const t = document.createElement('canvas'); t.width = w; t.height = h;
+  t.getContext('2d').drawImage(ctx.canvas, x0, y0, w, h, 0, 0, w, h);
+  ctx.fillStyle = backgroundAround(im, r);
+  ctx.fillRect(x0, y0, im.w - x0, h);
+  ctx.drawImage(t, x0 + need, y0);
+}
+
 function paint(ctx, im, peek) {
   ctx.drawImage(im.el, 0, 0);
-  if (!peek) for (const r of regions(im)) if (r.on) censor(ctx, im, padRect(r, im));
+  if (peek) return;
+  const on = regions(im).filter(r => r.on);
+  for (const r of on) censor(ctx, im, padRect(r, im));
+  const shifts = [];
+  const names = [];
+  for (const r of on) {
+    const a = aliasText(r);
+    if (!a) continue;
+    if (a.s.kind === 'avatar') drawAvatarAlias(ctx, r, a.p, a.text);
+    else names.push({ r, ...a });
+  }
+  names.sort((u, v) => u.r.y - v.r.y || u.r.x - v.r.x);
+  for (const { r: orig, s, p, text } of names) {
+    const cy = orig.y + orig.h / 2;
+    const dx = shifts.filter(k => cy >= k.y0 && cy < k.y1 && orig.x >= k.x).reduce((t, k) => t + k.need, 0);
+    const r = { ...orig, x: orig.x + dx };
+    const L = nameLayout(ctx, im, r, s, p, text);
+    const need = Math.ceil(L.width - r.w + (L.width > r.w ? L.gap : 0));
+    if ($('room').checked && need > 0) {
+      makeRoom(ctx, im, r, need);
+      const pad = Math.round(r.h * 0.2);
+      shifts.push({ y0: r.y - pad, y1: r.y + r.h + pad, x: orig.x + orig.w, need });
+    }
+    ctx.save();
+    ctx.font = L.font; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = inkColor(im, orig);
+    ctx.fillText(text, r.x, L.y);
+    ctx.restore();
+  }
+}
+
+function renderCanvas(im) {
+  const c = document.createElement('canvas'); c.width = im.w; c.height = im.h;
+  paint(c.getContext('2d'), im, false);
+  if (!im.crop) return c;
+  const k = im.crop, out = document.createElement('canvas'); out.width = k.w; out.height = k.h;
+  out.getContext('2d').drawImage(c, k.x, k.y, k.w, k.h, 0, 0, k.w, k.h);
+  return out;
 }
 
 function zoomFactor() {
   const im = S.cur;
   if (!im) return 1;
   if (S.zoom !== 'fit') return S.zoom;
-  const st = $('stage');
-  return Math.max(0.1, Math.min(2, (st.clientWidth - 32) / im.w));
+  return Math.max(0.1, Math.min(2, ($('stage').clientWidth - 32) / im.w));
 }
 
 function renderStage() {
   const im = S.cur;
   $('drop').style.display = im ? 'none' : '';
   $('wrap').style.display = im ? 'block' : 'none';
+  $('uncrop').hidden = !im?.crop;
   if (!im) { renderBanner(); return; }
   if (base.width !== im.w || base.height !== im.h) { base.width = over.width = im.w; base.height = over.height = im.h; }
   const z = zoomFactor();
@@ -661,15 +902,35 @@ function drawOverlay() {
   octx.clearRect(0, 0, over.width, over.height);
   if (!im) return;
   const k = im.w / (over.getBoundingClientRect().width || im.w);
-  octx.lineWidth = 2 * k;
-  if ($('outlines').checked && !S.peek) for (const r of regions(im)) {
-    const p = padRect(r, im);
-    octx.strokeStyle = r.color;
-    octx.setLineDash(r.on ? [] : [4 * k, 3 * k]);
-    octx.globalAlpha = r.on ? 1 : 0.8;
-    octx.strokeRect(p.x, p.y, p.w, p.h);
+  if (im.crop && !S.peek) {
+    const c = im.crop;
+    octx.fillStyle = 'rgba(20,10,30,.55)';
+    octx.fillRect(0, 0, im.w, c.y);
+    octx.fillRect(0, c.y + c.h, im.w, im.h - c.y - c.h);
+    octx.fillRect(0, c.y, c.x, c.h);
+    octx.fillRect(c.x + c.w, c.y, im.w - c.x - c.w, c.h);
+    octx.lineWidth = 1.5 * k; octx.setLineDash([6 * k, 4 * k]); octx.strokeStyle = '#ffffff';
+    octx.strokeRect(c.x, c.y, c.w, c.h);
   }
-  octx.globalAlpha = 1;
+  octx.lineWidth = 2 * k;
+  if ($('outlines').checked && !S.peek) {
+    const list = reviewList(im), focused = list[S.focus];
+    for (const r of list) {
+      const p = padRect(r, im);
+      octx.strokeStyle = r.color;
+      octx.setLineDash(r.on ? [] : [4 * k, 3 * k]);
+      octx.globalAlpha = r.on ? 1 : 0.8;
+      octx.strokeRect(p.x, p.y, p.w, p.h);
+    }
+    octx.globalAlpha = 1;
+    if (focused) {
+      const p = padRect(focused, im);
+      octx.setLineDash([]);
+      octx.lineWidth = 5 * k; octx.strokeStyle = '#ffffff'; octx.strokeRect(p.x - 3 * k, p.y - 3 * k, p.w + 6 * k, p.h + 6 * k);
+      octx.lineWidth = 2.5 * k; octx.strokeStyle = focused.color; octx.strokeRect(p.x - 3 * k, p.y - 3 * k, p.w + 6 * k, p.h + 6 * k);
+    }
+  }
+  octx.lineWidth = 2 * k;
   if (S.drag && S.drag.moved) {
     const r = dragRect(S.drag);
     octx.setLineDash([5 * k, 4 * k]); octx.strokeStyle = '#ffffff'; octx.strokeRect(r.x, r.y, r.w, r.h);
@@ -689,9 +950,47 @@ const HINTS = [
 function renderBanner() {
   const n = S.samples.length;
   let text = '';
-  if (S.cur && !S.hintsOff && S.mode === 'match' && n < HINTS.length && S.samples.every(s => s.origin) && !(n === 0 && S.cur.boxes.length)) text = HINTS[n];
+  if (S.mode === 'crop' && S.cur) text = 'drag over the part of the screenshot you want to keep';
+  else if (S.cur && !S.hintsOff && S.mode === 'match' && n < HINTS.length && S.samples.every(s => s.origin) && !(n === 0 && S.cur.boxes.length)) text = HINTS[n];
   $('bannerText').textContent = text;
+  $('bannerClose').hidden = S.mode === 'crop';
   $('banner').style.display = text ? 'block' : 'none';
+}
+
+function renderPeople() {
+  ensurePeople();
+  const el = $('people');
+  el.innerHTML = '';
+  for (const p of S.people) {
+    const d = document.createElement('div');
+    d.className = 'person' + (p.id === S.active ? ' on' : '');
+    d.dataset.id = p.id;
+    d.title = 'new boxes go to the highlighted person';
+    d.innerHTML = `<span class="dot"></span><input type="text" aria-label="person name"><input type="text" class="alias" aria-label="alias" placeholder="alias"><button class="x" title="remove person">×</button>`;
+    d.querySelector('.dot').style.background = p.color;
+    const [name, alias] = d.querySelectorAll('input');
+    name.value = p.name; alias.value = p.alias;
+    name.oninput = () => { p.name = name.value; saveData(); renderSampleOptions(); };
+    alias.oninput = () => { p.alias = alias.value; saveData(); renderStage(); renderSamples(); };
+    for (const i of [name, alias]) i.onkeydown = e => { if (e.key === 'Enter' || e.key === 'Escape') i.blur(); };
+    d.onclick = e => {
+      if (e.target.closest('.x') || S.active === p.id) return;
+      S.active = p.id; saveData(); renderPeople();
+    };
+    const x = d.querySelector('.x');
+    x.disabled = S.people.length < 2;
+    x.onclick = () => removePerson(p);
+    el.appendChild(d);
+  }
+}
+
+function renderSampleOptions() {
+  for (const sel of document.querySelectorAll('.sample select.who')) {
+    const v = sel.value;
+    sel.innerHTML = '';
+    for (const p of S.people) sel.add(new Option(p.name || 'unnamed', p.id));
+    sel.value = v;
+  }
 }
 
 function renderSamples() {
@@ -702,30 +1001,56 @@ function renderSamples() {
   }
   el.innerHTML = '';
   for (const s of S.samples) {
+    const p = personOf(s);
     const d = document.createElement('div');
     d.className = 'sample'; d.dataset.id = s.id;
     d.innerHTML = `<div class="top">
-        <span class="thumb" style="border-color:${s.color}"><img alt=""></span>
-        <input type="text" aria-label="name">
+        <span class="thumb"><img alt=""></span>
+        <input type="text" aria-label="item name">
         <span class="count"></span>
         <button class="x" title="remove">×</button>
       </div>
-      <div class="thr"><label>similarity</label><input type="range" min="50" max="100" step="1"><span></span></div>`;
+      <div class="opts">
+        <select class="who" aria-label="person"></select>
+        <select class="kind" aria-label="what it is">
+          <option value="name">name</option><option value="avatar">avatar</option><option value="other">other</option>
+        </select>
+      </div>
+      <div class="thr"><label>similarity</label><input type="range" class="sim" min="50" max="100" step="1"><span></span></div>`;
+    d.querySelector('.thumb').style.borderColor = p.color;
     d.querySelector('img').src = s.thumb;
     const name = d.querySelector('input[type=text]');
     name.value = s.label;
-    name.oninput = () => { s.label = name.value || 'item'; saveSamples(); };
+    name.oninput = () => { s.label = name.value || 'item'; saveData(); };
     name.onkeydown = e => { if (e.key === 'Enter' || e.key === 'Escape') name.blur(); };
-    const range = d.querySelector('input[type=range]'), pct = d.querySelector('.thr span');
+    const who = d.querySelector('.who');
+    for (const q of S.people) who.add(new Option(q.name || 'unnamed', q.id));
+    who.value = s.personId;
+    who.onchange = () => { s.personId = +who.value; saveData(); renderAll(); };
+    const kind = d.querySelector('.kind');
+    kind.value = s.kind;
+    kind.onchange = () => { s.kind = kind.value; saveData(); renderAll(); };
+    const range = d.querySelector('.sim'), pct = d.querySelector('.thr span');
     range.value = Math.round(s.thr * 100); pct.textContent = range.value + '%';
     range.oninput = () => { s.thr = range.value / 100; pct.textContent = range.value + '%'; renderStage(); renderCounts(); };
-    range.onchange = saveSamples;
+    range.onchange = saveData;
+    if (s.kind === 'name' && p.alias.trim()) {
+      const t = document.createElement('div');
+      t.className = 'thr';
+      t.innerHTML = `<label>alias size</label><input type="range" min="50" max="200" step="5"><span></span>`;
+      const tr = t.querySelector('input'), tp = t.querySelector('span');
+      tr.value = Math.round(s.textScale * 100); tp.textContent = tr.value + '%';
+      tr.oninput = () => { s.textScale = tr.value / 100; tp.textContent = tr.value + '%'; renderStage(); };
+      tr.onchange = saveData;
+      d.appendChild(t);
+    }
     d.querySelector('.x').onclick = () => removeSample(s);
     el.appendChild(d);
   }
   renderCounts();
 }
 
+let dragTile = null;
 function renderStrip() {
   const el = $('strip');
   el.style.display = S.images.length ? 'flex' : 'none';
@@ -733,12 +1058,27 @@ function renderStrip() {
   for (const im of S.images) {
     const t = document.createElement('div');
     t.className = 'tile' + (im === S.cur ? ' on' : ''); t.dataset.id = im.id;
-    t.title = im.stem;
-    t.innerHTML = `<img alt=""><div class="meta"><span></span><span class="n"></span></div><button class="x" title="remove screenshot">×</button>`;
+    t.title = `${im.stem} (drag to reorder)`;
+    t.draggable = true;
+    t.innerHTML = `<img alt="" draggable="false"><div class="meta"><span></span><span class="n"></span></div><button class="x" title="remove screenshot">×</button>`;
     t.querySelector('img').src = im.url;
     t.querySelector('.meta span').textContent = im.stem;
+    if (im.crop) t.insertAdjacentHTML('afterbegin', '<span class="crop-tag">cropped</span>');
     t.onclick = e => { if (!e.target.closest('.x')) select(im); };
     t.querySelector('.x').onclick = () => removeImage(im);
+    t.ondragstart = e => { dragTile = im; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(im.id)); };
+    t.ondragend = () => { dragTile = null; document.querySelectorAll('.tile.drag-over').forEach(x => x.classList.remove('drag-over')); };
+    t.ondragover = e => { if (!dragTile || dragTile === im) return; e.preventDefault(); t.classList.add('drag-over'); };
+    t.ondragleave = () => t.classList.remove('drag-over');
+    t.ondrop = e => {
+      if (!dragTile || dragTile === im) return;
+      e.preventDefault(); e.stopPropagation();
+      const from = S.images.indexOf(dragTile);
+      S.images.splice(from, 1);
+      S.images.splice(S.images.indexOf(im), 0, dragTile);
+      dragTile = null;
+      renderStrip();
+    };
     el.appendChild(t);
   }
   const add = document.createElement('button');
@@ -754,7 +1094,7 @@ function renderCounts() {
     if (!c) continue;
     const busy = S.images.some(im => im.results.get(s.id) === null);
     let n = 0;
-    for (const im of S.images) for (const r of regions(im)) if (r.key?.startsWith(s.id + ':') && r.on) n++;
+    for (const im of S.images) for (const r of regions(im)) if (r.sample === s && r.on) n++;
     c.textContent = busy ? 'searching…' : `${n} hidden`;
   }
   for (const im of S.images) {
@@ -764,13 +1104,14 @@ function renderCounts() {
   const has = S.images.length > 0;
   $('save').disabled = $('copy').disabled = !S.cur;
   $('saveAll').disabled = !has;
+  $('stitchBtn').disabled = S.images.length < 2;
   $('saveAll').textContent = S.images.length > 1 ? `save all (${S.images.length})` : 'save all';
   const hiddenTotal = S.images.reduce((n, im) => n + countOn(im), 0);
   $('objects').textContent = S.images.length ? `${S.images.length} screenshot${S.images.length > 1 ? 's' : ''} · ${hiddenTotal} hidden` : 'no screenshots';
   $('undo').disabled = !S.undo.length;
 }
 
-function renderAll() { renderStage(); renderSamples(); renderStrip(); }
+function renderAll() { renderStage(); renderPeople(); renderSamples(); renderStrip(); }
 
 function pushUndo(u) { S.undo.push(u); if (S.undo.length > 100) S.undo.shift(); renderCounts(); }
 function undo() {
@@ -804,6 +1145,13 @@ function hit(p) {
   return null;
 }
 
+function setCrop(im, c) {
+  const prev = im.crop;
+  im.crop = c;
+  pushUndo({ image: im, undo: () => { im.crop = prev; } });
+  renderStage(); renderStrip();
+}
+
 over.addEventListener('pointerdown', e => {
   if (!S.cur || e.button !== 0) return;
   over.setPointerCapture(e.pointerId);
@@ -813,7 +1161,7 @@ over.addEventListener('pointerdown', e => {
 over.addEventListener('pointermove', e => {
   if (!S.cur) return;
   const p = toImage(e);
-  if (!S.drag) { over.style.cursor = hit(p) ? 'pointer' : 'crosshair'; return; }
+  if (!S.drag) { over.style.cursor = S.mode !== 'crop' && hit(p) ? 'pointer' : 'crosshair'; return; }
   S.drag.b = p;
   if (Math.abs(p.x - S.drag.a.x) + Math.abs(p.y - S.drag.a.y) > 4) S.drag.moved = true;
   drawOverlay();
@@ -822,21 +1170,20 @@ over.addEventListener('pointerup', () => {
   const d = S.drag;
   S.drag = null;
   if (!d) return;
-  if (!d.moved) { toggleAt(d.a); return; }
+  if (!d.moved) { if (S.mode !== 'crop') toggleAt(d.a); return; }
   const r = dragRect(d);
   if (r.w < 3 || r.h < 3) { drawOverlay(); return; }
+  const im = S.cur;
+  if (S.mode === 'crop') { if (r.w >= 16 && r.h >= 16) setCrop(im, r); else drawOverlay(); return; }
   if (S.mode === 'box') {
-    const im = S.cur;
     im.boxes.push(r);
     pushUndo({ image: im, undo: () => { im.boxes = im.boxes.filter(b => b !== r); } });
     renderStage(); renderCounts();
-  } else sampleFromSelection(S.cur, r);
+  } else sampleFromSelection(im, r);
 });
 over.addEventListener('pointercancel', () => { S.drag = null; drawOverlay(); });
 
-function toggleAt(p) {
-  const im = S.cur, r = hit(p);
-  if (!r) return;
+function toggleRegion(im, r) {
   if (r.box) {
     const i = im.boxes.indexOf(r.box);
     im.boxes.splice(i, 1);
@@ -849,11 +1196,34 @@ function toggleAt(p) {
   renderStage(); renderCounts();
 }
 
-async function renderBlob(im) {
-  const c = document.createElement('canvas'); c.width = im.w; c.height = im.h;
-  paint(c.getContext('2d'), im, false);
-  return new Promise(r => c.toBlob(r, 'image/png'));
+function toggleAt(p) {
+  const r = hit(p);
+  if (r) toggleRegion(S.cur, r);
 }
+
+function step(dir) {
+  if (!S.cur) return;
+  const list = reviewList(S.cur);
+  if (!list.length) { toast('nothing hidden on this screenshot yet'); return; }
+  S.focus = S.focus < 0 ? (dir > 0 ? 0 : list.length - 1) : (S.focus + dir + list.length) % list.length;
+  const r = list[S.focus];
+  const o = over.getBoundingClientRect(), st = $('stage'), sr = st.getBoundingClientRect(), k = o.width / S.cur.w;
+  st.scrollTo({
+    left: st.scrollLeft + (o.left - sr.left) + (r.x + r.w / 2) * k - sr.width / 2,
+    top: st.scrollTop + (o.top - sr.top) + (r.y + r.h / 2) * k - sr.height / 2,
+    behavior: 'smooth',
+  });
+  drawOverlay();
+  toast(`match ${S.focus + 1} of ${list.length}${r.on ? '' : ' (off)'} · x to switch it`, 1500);
+}
+
+function toggleFocused() {
+  if (!S.cur) return;
+  const r = reviewList(S.cur)[S.focus];
+  if (r) { toggleRegion(S.cur, r); toast(r.box ? 'box removed' : (S.cur.off.has(r.key) ? 'match off' : 'match on'), 1200); }
+}
+
+function canvasBlob(c) { return new Promise(r => c.toBlob(r, 'image/png')); }
 
 function saveBlob(blob, name) {
   const a = document.createElement('a');
@@ -879,7 +1249,7 @@ function exportNames() {
 async function downloadCurrent() {
   if (!S.cur) return;
   await waitForMatches();
-  saveBlob(await renderBlob(S.cur), exportNames()[S.images.indexOf(S.cur)]);
+  saveBlob(await canvasBlob(renderCanvas(S.cur)), exportNames()[S.images.indexOf(S.cur)]);
 }
 
 async function downloadAll() {
@@ -890,25 +1260,167 @@ async function downloadAll() {
   if (window.JSZip) {
     setStatus('zipping…');
     const zip = new JSZip();
-    for (let i = 0; i < S.images.length; i++) zip.file(names[i], await renderBlob(S.images[i]));
+    for (let i = 0; i < S.images.length; i++) zip.file(names[i], await canvasBlob(renderCanvas(S.images[i])));
     saveBlob(await zip.generateAsync({ type: 'blob' }), 'censored-screenshots.zip');
     toast(`saved ${S.images.length} screenshots as a zip`);
   } else {
     for (let i = 0; i < S.images.length; i++) {
-      saveBlob(await renderBlob(S.images[i]), names[i]);
+      saveBlob(await canvasBlob(renderCanvas(S.images[i])), names[i]);
       await new Promise(r => setTimeout(r, 300));
     }
     toast(`saved ${S.images.length} screenshots`);
   }
 }
 
+function rowHashes(im) {
+  const k = im.crop || { x: 0, y: 0, w: im.w, h: im.h };
+  const d = new Uint32Array(im.ctx.getImageData(k.x, k.y, k.w, k.h).data.buffer), out = new Uint32Array(k.h);
+  for (let y = 0; y < k.h; y++) {
+    let h = 2166136261;
+    for (let x = 0, p = y * k.w; x < k.w; x++, p++) h = Math.imul(h ^ d[p], 16777619);
+    out[y] = h >>> 0;
+  }
+  return out;
+}
+
+function overlapRows(a, b) {
+  const max = Math.min(a.length, b.length) - 1;
+  for (let k = max; k >= 24; k--) {
+    let ok = true;
+    for (let j = 0, off = a.length - k; j < k; j++) if (a[off + j] !== b[j]) { ok = false; break; }
+    if (ok && new Set(b.subarray(0, k)).size > 4) return k;
+  }
+  return 0;
+}
+
+async function stitch() {
+  if (S.images.length < 2) return;
+  await waitForMatches();
+  setStatus('stitching…');
+  await new Promise(r => setTimeout(r, 30));
+  const parts = S.images.map(im => ({ im, c: renderCanvas(im), rows: rowHashes(im) }));
+  let height = 0, removed = 0;
+  parts.forEach((p, i) => {
+    const prev = parts[i - 1];
+    p.overlap = prev && prev.c.width === p.c.width ? overlapRows(prev.rows, p.rows) : 0;
+    removed += p.overlap;
+    p.y = height - p.overlap;
+    height = p.y + p.c.height;
+  });
+  const width = Math.max(...parts.map(p => p.c.width));
+  if (width * height > 268e6 || height > 32000) { setStatus(''); toast('too big to stitch in one image. try fewer screenshots.', 3500); return; }
+  const out = document.createElement('canvas'); out.width = width; out.height = height;
+  const ctx = out.getContext('2d');
+  const first = S.images[0];
+  ctx.fillStyle = backgroundAround(first, { x: 2, y: 2, w: 1, h: 1 });
+  ctx.fillRect(0, 0, width, height);
+  for (const p of parts) ctx.drawImage(p.c, 0, p.y);
+  saveBlob(await canvasBlob(out), 'stitched-censored.png');
+  setStatus('');
+  toast(removed ? `stitched ${parts.length} screenshots and removed ${removed}px of overlap` : `stitched ${parts.length} screenshots`, 3000);
+}
+
 async function copyCurrent() {
   if (!S.cur) return;
   try {
     await waitForMatches();
-    await navigator.clipboard.write([new ClipboardItem({ 'image/png': renderBlob(S.cur) })]);
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': canvasBlob(renderCanvas(S.cur)) })]);
     toast('copied. paste it anywhere.');
-  } catch { toast("your browser blocked copying. use save instead.", 3000); }
+  } catch { toast('your browser blocked copying. use save instead.', 3000); }
+}
+
+let tessWorker = null;
+function loadTesseract() {
+  tessWorker ??= new Promise((resolve, reject) => {
+    if (window.Tesseract) return resolve(window.Tesseract);
+    const s = document.createElement('script');
+    s.src = TESSERACT_URL;
+    s.onload = () => resolve(window.Tesseract);
+    s.onerror = () => reject(new Error('could not load the text reader'));
+    document.head.appendChild(s);
+  }).then(T => T.createWorker('eng')).catch(err => { tessWorker = null; throw err; });
+  return tessWorker;
+}
+
+const norm = t => t.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]/gu, '');
+function editDistance(a, b) {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0]; row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return row[b.length];
+}
+const nameMatches = (word, target) => word === target || (target.length >= 4 && Math.abs(word.length - target.length) <= 1 && editDistance(word, target) <= 1);
+
+function ocrCanvas(im) {
+  const f = 2, c = document.createElement('canvas'); c.width = im.w * f; c.height = im.h * f;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(im.el, 0, 0, c.width, c.height);
+  const img = ctx.getImageData(0, 0, c.width, c.height), d = img.data;
+  let sum = 0;
+  for (let p = 0; p < d.length; p += 16) sum += d[p] * 0.299 + d[p + 1] * 0.587 + d[p + 2] * 0.114;
+  const dark = sum / (d.length / 16) < 128;
+  for (let p = 0; p < d.length; p += 4) {
+    let g = d[p] * 0.299 + d[p + 1] * 0.587 + d[p + 2] * 0.114;
+    if (dark) g = 255 - g;
+    d[p] = d[p + 1] = d[p + 2] = g;
+  }
+  ctx.putImageData(img, 0, 0);
+  return { c, f };
+}
+
+function wordsOf(data) {
+  if (Array.isArray(data.words) && data.words.length) return data.words;
+  const out = [];
+  for (const b of data.blocks || []) for (const p of b.paragraphs || []) for (const l of p.lines || []) out.push(...(l.words || []));
+  return out;
+}
+
+async function findByName() {
+  const target = norm($('findName').value);
+  if (!target) { $('findName').focus(); return; }
+  if (!S.images.length) { toast('add a screenshot first'); return; }
+  $('findBtn').disabled = true;
+  try {
+    setStatus('loading the text reader… the first time takes a few seconds');
+    const w = await loadTesseract();
+    let added = 0, seen = 0;
+    const order = [S.cur, ...S.images.filter(i => i !== S.cur)];
+    for (const [i, im] of order.entries()) {
+      setStatus(`reading screenshot ${i + 1} of ${order.length}…`);
+      const { c, f } = ocrCanvas(im);
+      const { data } = await w.recognize(c, {}, { blocks: true });
+      const hits = wordsOf(data).filter(x => nameMatches(norm(x.text || ''), target));
+      seen += hits.length;
+      for (const h of hits) {
+        const r = { x: Math.max(0, Math.floor(h.bbox.x0 / f) - 3), y: Math.max(0, Math.floor(h.bbox.y0 / f) - 3) };
+        r.w = Math.min(im.w, Math.ceil(h.bbox.x1 / f) + 3) - r.x;
+        r.h = Math.min(im.h, Math.ceil(h.bbox.y1 / f) + 3) - r.y;
+        await idle();
+        const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+        if (regions(im).some(q => q.on && cx >= q.x && cx <= q.x + q.w && cy >= q.y && cy <= q.y + q.h)) continue;
+        sampleFromSelection(im, r);
+        added++;
+      }
+      if (added) break;
+    }
+    await idle();
+    setStatus('');
+    if (added) toast(`found "${$('findName').value.trim()}" and hid every copy. avatars still need a box.`, 3500);
+    else if (seen) toast('that name is already hidden', 2500);
+    else toast(`couldn't read "${$('findName').value.trim()}" anywhere. drag a box around it instead.`, 3500);
+  } catch (err) {
+    setStatus('');
+    toast(String(err.message || err), 3500);
+  } finally {
+    $('findBtn').disabled = false;
+  }
 }
 
 let toastTimer;
@@ -927,6 +1439,7 @@ function setMode(m) {
   S.mode = m;
   for (const b of $('mode').children) b.classList.toggle('on', b.dataset.mode === m);
   renderBanner();
+  drawOverlay();
 }
 $('mode').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
 
@@ -944,30 +1457,37 @@ $('stage').addEventListener('wheel', e => {
 }, { passive: false });
 new ResizeObserver(() => { if (S.zoom === 'fit') renderStage(); else drawOverlay(); }).observe($('stage'));
 
-for (const id of ['style', 'color', 'pad', 'outlines']) $(id).addEventListener('input', () => { renderStage(); saveLook(); });
+for (const id of ['style', 'color', 'pad', 'outlines', 'room']) $(id).addEventListener('input', () => { renderStage(); saveLook(); });
 $('style').addEventListener('input', () => { $('color').style.display = $('style').value === 'solid' ? '' : 'none'; });
+$('scales').addEventListener('change', () => { saveLook(); rematchAll(); });
 $('remember').addEventListener('change', () => {
   saveLook();
-  if ($('remember').checked) { saveSamples(); toast('saved on this device'); }
-  else storeSet(STORE.samples, null);
+  if ($('remember').checked) { saveData(); toast('saved on this device'); }
+  else { storeSet(STORE.data, null); storeSet(STORE.legacy, null); }
 });
 
 $('undo').onclick = undo;
 $('bannerClose').onclick = () => { S.hintsOff = true; renderBanner(); };
 $('save').onclick = downloadCurrent;
 $('saveAll').onclick = downloadAll;
+$('stitchBtn').onclick = stitch;
 $('copy').onclick = copyCurrent;
+$('uncrop').onclick = () => { if (S.cur?.crop) setCrop(S.cur, null); };
+$('addPerson').onclick = addPerson;
+$('findBtn').onclick = findByName;
+$('findName').addEventListener('keydown', e => { if (e.key === 'Enter') findByName(); });
 $('addBtn').onclick = $('pickBtn').onclick = () => $('file').click();
 $('file').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
 
 window.addEventListener('paste', e => {
+  if (e.target.closest?.('input[type=text]')) return;
   const files = [...e.clipboardData.items].filter(i => i.type.startsWith('image/')).map(i => i.getAsFile());
   if (files.length) { e.preventDefault(); addFiles(files); }
 });
 
 let dragDepth = 0;
 window.addEventListener('dragenter', e => { if (e.dataTransfer?.types.includes('Files')) { dragDepth++; document.body.classList.add('dragging'); } });
-window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+window.addEventListener('dragleave', e => { if (!e.dataTransfer?.types.includes('Files')) return; if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => {
   e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
@@ -985,12 +1505,35 @@ window.addEventListener('keydown', e => {
     if (S.images[j]) { e.preventDefault(); select(S.images[j]); }
     return;
   }
-  if (e.key === 'm' || e.key === 'M') setMode('match');
-  if (e.key === 'b' || e.key === 'B') setMode('box');
-  if (e.key === 'Escape' && S.drag) { S.drag = null; drawOverlay(); }
+  const k = e.key.toLowerCase();
+  if (k === 'm') setMode('match');
+  else if (k === 'b') setMode('box');
+  else if (k === 'c') setMode('crop');
+  else if (k === 'n') step(e.shiftKey ? -1 : 1);
+  else if (k === 'x') toggleFocused();
+  else if (e.key === 'Escape') {
+    if (S.drag) { S.drag = null; drawOverlay(); }
+    else if (S.focus >= 0) { S.focus = -1; drawOverlay(); }
+  }
 });
 window.addEventListener('keyup', e => { if (e.key === ' ' && S.peek) { e.preventDefault(); S.peek = false; renderStage(); } });
 window.addEventListener('blur', () => { if (S.peek) { S.peek = false; renderStage(); } });
+
+async function receiveShared() {
+  if (!new URLSearchParams(location.search).has('shared') || !('caches' in window)) return;
+  history.replaceState(null, '', location.pathname);
+  try {
+    const cache = await caches.open('share-inbox');
+    const files = [];
+    for (const req of await cache.keys()) {
+      const res = await cache.match(req);
+      const blob = await res.blob();
+      files.push(new File([blob], decodeURIComponent(res.headers.get('x-name') || 'shared.png'), { type: blob.type || 'image/png' }));
+      await cache.delete(req);
+    }
+    if (files.length) await addFiles(files);
+  } catch {}
+}
 
 (async () => {
   const l = storeGet(STORE.look);
@@ -1000,10 +1543,15 @@ window.addEventListener('blur', () => { if (S.peek) { S.peek = false; renderStag
     if (Number.isFinite(l.pad)) $('pad').value = l.pad;
     $('outlines').checked = l.outlines !== false;
     $('remember').checked = !!l.remember;
+    $('scales').checked = !!l.scales;
+    if ('room' in l) $('room').checked = !!l.room;
   }
   $('color').style.display = $('style').value === 'solid' ? '' : 'none';
-  if ($('remember').checked) await restoreSamples();
+  if ($('remember').checked) await restoreData();
+  ensurePeople();
   renderAll();
+  await receiveShared();
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
 })();
 </script>
 </body>
