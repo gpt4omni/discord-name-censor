@@ -221,6 +221,7 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
         <div class="body">
           <div id="samples"></div>
           <div class="find"><input id="findName" type="text" placeholder="or type a name to find it" aria-label="name to find"><button id="findBtn" class="small-btn">find</button></div>
+          <button id="timeBtn" class="small-btn" style="margin-top:6px">hide times and dates</button>
           <label class="check" style="margin-top:8px"><input type="checkbox" id="scales"><span>also find other zoom levels (avatars and longer names, slower)</span></label>
         </div>
       </section>
@@ -238,6 +239,7 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
           </div>
           <div class="row"><label for="pad">padding</label><input type="range" id="pad" min="0" max="12" value="2" style="width:110px"></div>
           <label class="check" style="margin-bottom:7px"><input type="checkbox" id="outlines" checked><span>show outlines while editing</span></label>
+          <label class="check" style="margin-bottom:7px"><input type="checkbox" id="plainNames" checked><span>save as censored-01.png and so on, so the original filename (which often has the date in it) isn't kept. saved images never carry metadata.</span></label>
           <p class="hint">erase and solid block are the safe ones. blur and pixelate can sometimes be undone.</p>
         </div>
       </section>
@@ -492,7 +494,7 @@ function storeSet(k, v) { try { v == null ? localStorage.removeItem(k) : localSt
 
 function look() {
   return { style: $('style').value, color: $('color').value, pad: +$('pad').value, outlines: $('outlines').checked,
-    remember: $('remember').checked, scales: $('scales').checked, room: $('room').checked };
+    remember: $('remember').checked, scales: $('scales').checked, room: $('room').checked, plainNames: $('plainNames').checked };
 }
 function saveLook() { storeSet(STORE.look, look()); }
 function saveData() {
@@ -1241,8 +1243,11 @@ async function waitForMatches() {
 function exportNames() {
   const used = new Map();
   return S.images.map(im => {
-    const n = used.get(im.stem) || 0; used.set(im.stem, n + 1);
-    return `${im.stem}${n ? '-' + (n + 1) : ''}-censored.png`;
+    if (!$('plainNames').checked) {
+      const n = used.get(im.stem) || 0; used.set(im.stem, n + 1);
+      return `${im.stem}${n ? '-' + (n + 1) : ''}-censored.png`;
+    }
+    return `censored-${String(S.images.indexOf(im) + 1).padStart(2, '0')}.png`;
   });
 }
 
@@ -1260,7 +1265,7 @@ async function downloadAll() {
   if (window.JSZip) {
     setStatus('zipping…');
     const zip = new JSZip();
-    for (let i = 0; i < S.images.length; i++) zip.file(names[i], await canvasBlob(renderCanvas(S.images[i])));
+    for (let i = 0; i < S.images.length; i++) zip.file(names[i], await canvasBlob(renderCanvas(S.images[i])), { date: new Date(2000, 0, 1) });
     saveBlob(await zip.generateAsync({ type: 'blob' }), 'censored-screenshots.zip');
     toast(`saved ${S.images.length} screenshots as a zip`);
   } else {
@@ -1357,8 +1362,8 @@ function editDistance(a, b) {
 }
 const nameMatches = (word, target) => word === target || (target.length >= 4 && Math.abs(word.length - target.length) <= 1 && editDistance(word, target) <= 1);
 
-function ocrCanvas(im) {
-  const f = 2, c = document.createElement('canvas'); c.width = im.w * f; c.height = im.h * f;
+function ocrCanvas(im, f = 2) {
+  const c = document.createElement('canvas'); c.width = im.w * f; c.height = im.h * f;
   const ctx = c.getContext('2d');
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(im.el, 0, 0, c.width, c.height);
@@ -1380,6 +1385,84 @@ function wordsOf(data) {
   const out = [];
   for (const b of data.blocks || []) for (const p of b.paragraphs || []) for (const l of p.lines || []) out.push(...(l.words || []));
   return out;
+}
+
+function linesOf(data) {
+  if (Array.isArray(data.lines) && data.lines.length) return data.lines;
+  const out = [];
+  for (const b of data.blocks || []) for (const p of b.paragraphs || []) out.push(...(p.lines || []));
+  return out;
+}
+
+const MONTH = /^(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?)\.?,?$/i;
+function timeToken(t) {
+  t = t.replace(/^[—–\-•·(\[]+|[)\]]+$/g, '');
+  if (/^\d{1,2}[:.]\d{2}([:.]\d{2})?([ap]\.?m\.?)?,?$/i.test(t)) return 'strong';
+  if (/^\d{1,4}[\/.\-]\d{1,2}[\/.\-]\d{2,4},?$/.test(t)) return 'strong';
+  if (MONTH.test(t)) return 'month';
+  if (/^\d{1,4}(st|nd|rd|th)?,?$/i.test(t)) return 'number';
+  if (/^([ap]\.?m\.?|at|today|yesterday|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|—|–|-)$/i.test(t)) return 'weak';
+  return null;
+}
+
+function timeRuns(words) {
+  const runs = [];
+  let cur = [];
+  const flush = () => {
+    const kinds = cur.map(w => w.kind);
+    const keep = kinds.includes('strong') || (kinds.includes('month') && kinds.includes('number'));
+    if (keep) {
+      while (cur.length && /^(at|—|–|-)$/i.test(cur[0].text)) cur.shift();
+      if (cur.length) runs.push(cur);
+    }
+    cur = [];
+  };
+  for (const w of words) {
+    const kind = timeToken((w.text || '').trim());
+    if (kind) cur.push({ ...w, kind }); else flush();
+  }
+  flush();
+  return runs;
+}
+
+async function hideTimes() {
+  if (!S.images.length) { toast('add a screenshot first'); return; }
+  $('timeBtn').disabled = true;
+  try {
+    setStatus('loading the text reader… the first time takes a few seconds');
+    const w = await loadTesseract();
+    let added = 0;
+    const undoList = [];
+    for (const [i, im] of S.images.entries()) {
+      setStatus(`looking for times in screenshot ${i + 1} of ${S.images.length}…`);
+      const covered = regions(im).filter(q => q.on);
+      for (const scale of [3, 2]) {
+        const { c, f } = ocrCanvas(im, scale);
+        const { data } = await w.recognize(c, {}, { blocks: true });
+        for (const line of linesOf(data)) for (const run of timeRuns(line.words || [])) {
+          const x0 = Math.min(...run.map(q => q.bbox.x0)), y0 = Math.min(...run.map(q => q.bbox.y0));
+          const x1 = Math.max(...run.map(q => q.bbox.x1)), y1 = Math.max(...run.map(q => q.bbox.y1));
+          const r = { x: Math.max(0, Math.floor(x0 / f) - 2), y: Math.max(0, Math.floor(y0 / f) - 2) };
+          r.w = Math.min(im.w, Math.ceil(x1 / f) + 2) - r.x;
+          r.h = Math.min(im.h, Math.ceil(y1 / f) + 2) - r.y;
+          const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+          if (covered.some(q => cx >= q.x && cx <= q.x + q.w && cy >= q.y && cy <= q.y + q.h)) continue;
+          r.time = true;
+          im.boxes.push(r); covered.push(r); undoList.push([im, r]);
+          added++;
+        }
+      }
+    }
+    if (undoList.length) pushUndo({ undo: () => { for (const [im, r] of undoList) im.boxes = im.boxes.filter(b => b !== r); } });
+    setStatus('');
+    renderStage(); renderStrip(); renderCounts();
+    toast(added ? `hid ${added} time${added === 1 ? '' : 's'} and date${added === 1 ? '' : 's'}. click a box to bring one back.` : 'no times or dates found', 3000);
+  } catch (err) {
+    setStatus('');
+    toast(String(err.message || err), 3500);
+  } finally {
+    $('timeBtn').disabled = false;
+  }
 }
 
 async function findByName() {
@@ -1457,7 +1540,7 @@ $('stage').addEventListener('wheel', e => {
 }, { passive: false });
 new ResizeObserver(() => { if (S.zoom === 'fit') renderStage(); else drawOverlay(); }).observe($('stage'));
 
-for (const id of ['style', 'color', 'pad', 'outlines', 'room']) $(id).addEventListener('input', () => { renderStage(); saveLook(); });
+for (const id of ['style', 'color', 'pad', 'outlines', 'room', 'plainNames']) $(id).addEventListener('input', () => { renderStage(); saveLook(); });
 $('style').addEventListener('input', () => { $('color').style.display = $('style').value === 'solid' ? '' : 'none'; });
 $('scales').addEventListener('change', () => { saveLook(); rematchAll(); });
 $('remember').addEventListener('change', () => {
@@ -1475,6 +1558,7 @@ $('copy').onclick = copyCurrent;
 $('uncrop').onclick = () => { if (S.cur?.crop) setCrop(S.cur, null); };
 $('addPerson').onclick = addPerson;
 $('findBtn').onclick = findByName;
+$('timeBtn').onclick = hideTimes;
 $('findName').addEventListener('keydown', e => { if (e.key === 'Enter') findByName(); });
 $('addBtn').onclick = $('pickBtn').onclick = () => $('file').click();
 $('file').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
@@ -1545,6 +1629,7 @@ async function receiveShared() {
     $('remember').checked = !!l.remember;
     $('scales').checked = !!l.scales;
     if ('room' in l) $('room').checked = !!l.room;
+    if ('plainNames' in l) $('plainNames').checked = !!l.plainNames;
   }
   $('color').style.display = $('style').value === 'solid' ? '' : 'none';
   if ($('remember').checked) await restoreData();

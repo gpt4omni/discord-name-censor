@@ -21,6 +21,8 @@ Tick **remember people and things to hide on this device** and new screenshots a
 - **Several people.** Add a person for each name you want hidden. New boxes go to the highlighted person.
 - **Aliases.** Give a person an alias and it is drawn where their name was, in the same colour and size. Their avatar becomes a coloured circle with the alias's first letter. When an alias is longer than the real name, the rest of the line slides over to make room.
 - **Find by typing.** Type a name and click **find**. Text recognition (tesseract.js) finds it in the screenshot and adds it.
+- **Times and dates.** Click **hide times and dates** to cover message timestamps and date dividers in every screenshot. Click a box to bring one back.
+- **No metadata.** Saved images are re-encoded PNGs with no EXIF or text chunks. By default they are named `censored-01.png` and so on, so a filename like `Screenshot 2026-10-18 235012.png` doesn't give the date away.
 - **Crop.** Use the crop tool to trim a screenshot. Saving and stitching use the cropped area.
 - **Stitch.** Joins every screenshot, top to bottom, into one image and removes rows that overlap between consecutive screenshots. Drag the thumbnails to change the order.
 - **Other zoom levels.** Tick **also find other zoom levels** to match avatars and longer names in screenshots taken at a different Discord zoom.
