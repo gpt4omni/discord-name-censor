@@ -197,7 +197,7 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
         <div id="stage">
           <div id="drop">
             <strong>drop screenshots here</strong>
-            or paste with ctrl+v. add as many as you want. anything you hide in one gets hidden in all of them.
+            or paste with ctrl+v
             <br><button class="primary" id="pickBtn">choose files</button>
           </div>
           <div id="wrap">
@@ -214,17 +214,16 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
         <div class="body">
           <div id="people"></div>
           <button id="addPerson" class="small-btn">+ add person</button>
-          <label class="check" style="margin-top:8px"><input type="checkbox" id="room" checked><span>slide the rest of the line over when an alias is longer</span></label>
-          <p class="hint" style="margin-top:6px">new boxes go to the highlighted person. give someone an alias and it gets drawn where their name was. typing their real display name helps the alias come out the right size.</p>
+          <label class="check" style="margin-top:8px"><input type="checkbox" id="room" checked><span>make room for longer aliases</span></label>
         </div>
       </section>
       <section class="pane">
         <h2>things to hide</h2>
         <div class="body">
           <div id="samples"></div>
-          <div class="find"><input id="findName" type="text" placeholder="or type a name to find it" aria-label="name to find"><button id="findBtn" class="small-btn">find</button></div>
+          <div class="find"><input id="findName" type="text" placeholder="type a name" aria-label="name to find"><button id="findBtn" class="small-btn">find</button></div>
           <button id="timeBtn" class="small-btn" style="margin-top:6px">hide times and dates</button>
-          <label class="check" style="margin-top:8px"><input type="checkbox" id="scales"><span>also find other zoom levels (avatars and longer names, slower)</span></label>
+          <label class="check" style="margin-top:8px"><input type="checkbox" id="scales"><span>match other zoom levels (slow)</span></label>
         </div>
       </section>
       <section class="pane">
@@ -241,31 +240,26 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
           </div>
           <div class="row"><label for="pad">padding</label><input type="range" id="pad" min="0" max="12" value="2" style="width:110px"></div>
           <label class="check" style="margin-bottom:7px"><input type="checkbox" id="outlines" checked><span>show outlines while editing</span></label>
-          <label class="check" style="margin-bottom:7px"><input type="checkbox" id="plainNames" checked><span>save as censored-01.png and so on, so the original filename (which often has the date in it) isn't kept. saved images never carry metadata.</span></label>
-          <p class="hint">erase and solid block are the safe ones. blur and pixelate can sometimes be undone.</p>
+          <label class="check" style="margin-bottom:7px"><input type="checkbox" id="plainNames" checked><span>rename files to censored-01.png</span></label>
+          <p class="hint">blur and pixelate can sometimes be reversed</p>
         </div>
       </section>
       <section class="pane">
         <h2>remember</h2>
         <div class="body">
-          <label class="check"><input type="checkbox" id="remember"><span>remember people and things to hide on this device. new screenshots get censored the moment you add them.</span></label>
+          <label class="check"><input type="checkbox" id="remember"><span>remember on this device</span></label>
         </div>
       </section>
       <details class="pane">
         <summary>how to use</summary>
         <div class="body">
           <ol class="hint">
-            <li>add screenshots: drop them in, paste with <kbd>ctrl</kbd>+<kbd>v</kbd>, or pick files.</li>
-            <li>drag a box around <b>your name</b>. every copy in every screenshot gets covered.</li>
-            <li>do the same for <b>your avatar</b>.</li>
-            <li><b>don't skip replies:</b> drag around the small name and avatar on any reply lines too.</li>
-            <li>hiding someone else too? <b>add a person</b>, highlight them, then drag their name and avatar.</li>
-            <li><b>click</b> a box to turn one match off or on. lower a slider if some copies got missed.</li>
-            <li><b>crop</b> trims a screenshot. <b>stitch</b> joins them all into one tall image and removes overlap.</li>
+            <li>drag a box around your name</li>
+            <li>then your avatar</li>
+            <li>then the small name and avatar on reply lines</li>
+            <li>click a box to turn it off</li>
           </ol>
-          <p class="hint" style="margin-top:6px"><b>keys:</b> hold <kbd>space</kbd> to see the original · <kbd>ctrl</kbd>+<kbd>z</kbd> undo · <kbd>←</kbd> <kbd>→</kbd> switch screenshots · <kbd>n</kbd> / <kbd>shift</kbd>+<kbd>n</kbd> step through matches · <kbd>x</kbd> turn the current match off or on · <kbd>m</kbd> <kbd>b</kbd> <kbd>c</kbd> tools</p>
-          <p class="hint" style="margin-top:6px">screenshots at a different discord zoom need their own boxes, or tick "also find other zoom levels".</p>
-          <p class="hint" style="margin-top:6px">on your phone, install this as an app and you can share screenshots straight into it.</p>
+          <p class="hint" style="margin-top:6px"><kbd>space</kbd> peek · <kbd>←</kbd> <kbd>→</kbd> switch · <kbd>n</kbd> next match · <kbd>x</kbd> toggle · <kbd>m</kbd> <kbd>b</kbd> <kbd>c</kbd> tools</p>
         </div>
       </details>
       <section class="pane">
@@ -279,7 +273,6 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
   </main>
   <div class="statusbar">
     <span class="cell" id="objects">no screenshots</span>
-    <span class="cell">nothing leaves your browser</span>
     <span class="end"><a href="https://milly.works4you.dev/" target="_blank" rel="noopener">milly.works4you.dev</a></span>
   </div>
 </div>
@@ -555,7 +548,7 @@ async function decode(file) {
 
 async function addFiles(files) {
   const list = [...files].filter(f => f && f.type.startsWith('image/'));
-  if (!list.length) { toast('no images in that'); return; }
+  if (!list.length) { toast('no images'); return; }
   let first = null;
   for (const f of list) {
     try {
@@ -566,7 +559,7 @@ async function addFiles(files) {
     } catch { toast(`couldn't open ${f.name || 'that image'}`); }
   }
   if (first) select(first);
-  if (list.length > 1) toast(`added ${list.length} screenshots`);
+  if (list.length > 1) toast(`added ${list.length}`);
 }
 
 function removeImage(im) {
@@ -577,7 +570,7 @@ function removeImage(im) {
   if (wasCur) { S.cur = S.images[Math.min(i, S.images.length - 1)] || null; S.focus = -1; }
   pushUndo({ undo: () => { S.images.splice(Math.min(i, S.images.length), 0, im); if (wasCur || !S.cur) select(im); } });
   renderAll();
-  toast('screenshot removed. ctrl+z brings it back.', 2000);
+  toast('removed');
 }
 
 function select(im) {
@@ -618,7 +611,7 @@ function onResult(e) {
 function idle() { return S.pending ? new Promise(r => S.waiters.push(r)) : Promise.resolve(); }
 
 function showProgress() {
-  if (S.pending) setStatus(`looking for matches… ${S.pending} left`);
+  if (S.pending) setStatus(`matching… ${S.pending} left`);
   else if ($('status').dataset.kind === 'progress') setStatus('');
 }
 
@@ -672,7 +665,7 @@ function removeSample(s, undoable = true) {
 function sampleFromSelection(im, r) {
   ensurePeople();
   r = trim(im, r);
-  if (!r) { toast("nothing to hide in that box. drag over the name or avatar.", 2500); drawOverlay(); return null; }
+  if (!r) { toast('nothing in that box'); drawOverlay(); return null; }
   const data = im.ctx.getImageData(r.x, r.y, r.w, r.h).data;
   const kind = guessKind(r.w, r.h);
   const n = S.samples.filter(s => s.kind === kind).length + 1;
@@ -949,16 +942,16 @@ function drawOverlay() {
 }
 
 const HINTS = [
-  'drag a box around your name to hide it everywhere',
-  'nice. now drag a box around your avatar',
-  'any replies? drag around the small name on a reply line too',
-  'and the small avatar next to it. then you\'re done',
+  'drag a box around your name',
+  'now your avatar',
+  'reply lines too, the small name',
+  'and the small avatar',
 ];
 
 function renderBanner() {
   const n = S.samples.length;
   let text = '';
-  if (S.mode === 'crop' && S.cur) text = 'drag over the part of the screenshot you want to keep';
+  if (S.mode === 'crop' && S.cur) text = 'drag over the part to keep';
   else if (S.cur && !S.hintsOff && S.mode === 'match' && n < HINTS.length && S.samples.every(s => s.origin) && !(n === 0 && S.cur.boxes.length)) text = HINTS[n];
   $('bannerText').textContent = text;
   $('bannerClose').hidden = S.mode === 'crop';
@@ -974,7 +967,6 @@ function renderPeople() {
     d.className = 'person' + (p.id === S.active ? ' on' : '');
     d.dataset.id = p.id;
     d.tabIndex = 0; d.setAttribute('role', 'button'); d.setAttribute('aria-pressed', String(p.id === S.active));
-    d.title = 'new boxes go to the highlighted person';
     d.innerHTML = `<span class="dot"></span><input type="text" aria-label="person name"><input type="text" class="alias" aria-label="alias" placeholder="alias"><button class="x" title="remove person">×</button>`;
     d.querySelector('.dot').style.background = p.color;
     const [name, alias] = d.querySelectorAll('input');
@@ -1007,7 +999,7 @@ function renderSampleOptions() {
 function renderSamples() {
   const el = $('samples');
   if (!S.samples.length) {
-    el.innerHTML = `<div class="empty-list">${S.images.length ? 'drag a box around your name, then your avatar. do the same for the small name and avatar on any replies.' : 'add a screenshot, then drag a box around your name, your avatar, and the small name and avatar on any replies.'}</div>`;
+    el.innerHTML = `<div class="empty-list">${S.images.length ? 'nothing yet' : 'add a screenshot first'}</div>`;
     return;
   }
   el.innerHTML = '';
@@ -1227,7 +1219,7 @@ function step(dir) {
     behavior: 'smooth',
   });
   drawOverlay();
-  toast(`match ${S.focus + 1} of ${list.length}${r.on ? '' : ' (off)'} · x to switch it`, 1500);
+  toast(`${S.focus + 1} / ${list.length}${r.on ? '' : ' (off)'}`, 1500);
 }
 
 function toggleFocused() {
@@ -1247,7 +1239,7 @@ function saveBlob(blob, name) {
 
 async function waitForMatches() {
   if (!S.pending) return;
-  setStatus('finishing up matches…', 'progress');
+  setStatus('matching…', 'progress');
   await idle();
 }
 
@@ -1280,13 +1272,13 @@ async function downloadAll() {
     const zip = new JSZip();
     for (let i = 0; i < S.images.length; i++) zip.file(names[i], await canvasBlob(renderCanvas(S.images[i])), { date: new Date(2000, 0, 1) });
     saveBlob(await zip.generateAsync({ type: 'blob' }), 'censored-screenshots.zip');
-    toast(`saved ${S.images.length} screenshots as a zip`);
+    toast('saved zip');
   } else {
     for (let i = 0; i < S.images.length; i++) {
       saveBlob(await canvasBlob(renderCanvas(S.images[i])), names[i]);
       await new Promise(r => setTimeout(r, 300));
     }
-    toast(`saved ${S.images.length} screenshots`);
+    toast('saved');
   }
 }
 
@@ -1326,7 +1318,7 @@ async function stitch() {
     height = p.y + p.c.height;
   });
   const width = Math.max(...parts.map(p => p.c.width));
-  if (width * height > 268e6 || height > 32000) { setStatus(''); toast('too big to stitch in one image. try fewer screenshots.', 3500); return; }
+  if (width * height > 268e6 || height > 32000) { setStatus(''); toast('too big to stitch', 3000); return; }
   const out = document.createElement('canvas'); out.width = width; out.height = height;
   const ctx = out.getContext('2d');
   const first = S.images[0];
@@ -1335,7 +1327,7 @@ async function stitch() {
   for (const p of parts) ctx.drawImage(p.c, 0, p.y);
   saveBlob(await canvasBlob(out), 'stitched-censored.png');
   setStatus('');
-  toast(removed ? `stitched ${parts.length} screenshots and removed ${removed}px of overlap` : `stitched ${parts.length} screenshots`, 3000);
+  toast('stitched');
 }
 
 async function copyCurrent() {
@@ -1343,8 +1335,8 @@ async function copyCurrent() {
   try {
     await waitForMatches();
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': canvasBlob(renderCanvas(S.cur)) })]);
-    toast('copied. paste it anywhere.');
-  } catch { toast('your browser blocked copying. use save instead.', 3000); }
+    toast('copied');
+  } catch { toast("couldn't copy, use save", 3000); }
 }
 
 let tessWorker = null;
@@ -1444,12 +1436,12 @@ async function hideTimes() {
   if (!S.images.length) { toast('add a screenshot first'); return; }
   $('timeBtn').disabled = true;
   try {
-    setStatus('loading the text reader… the first time takes a few seconds');
+    setStatus('loading text reader…');
     const w = await loadTesseract();
     let added = 0;
     const undoList = [];
     for (const [i, im] of S.images.entries()) {
-      setStatus(`looking for times in screenshot ${i + 1} of ${S.images.length}…`);
+      setStatus(`reading ${i + 1}/${S.images.length}…`);
       const covered = regions(im).filter(q => q.on);
       for (const scale of [3, 2]) {
         const { c, f } = ocrCanvas(im, scale);
@@ -1471,7 +1463,7 @@ async function hideTimes() {
     if (undoList.length) pushUndo({ undo: () => { for (const [im, r] of undoList) im.boxes = im.boxes.filter(b => b !== r); } });
     setStatus('');
     renderStage(); renderStrip(); renderCounts();
-    toast(added ? `hid ${added} time${added === 1 ? '' : 's'} and date${added === 1 ? '' : 's'}. click a box to bring one back.` : 'no times or dates found', 3000);
+    toast(added ? `hid ${added}` : 'no times found', 2500);
   } catch (err) {
     setStatus('');
     toast(String(err.message || err), 3500);
@@ -1486,12 +1478,12 @@ async function findByName() {
   if (!S.images.length) { toast('add a screenshot first'); return; }
   $('findBtn').disabled = true;
   try {
-    setStatus('loading the text reader… the first time takes a few seconds');
+    setStatus('loading text reader…');
     const w = await loadTesseract();
     let added = 0, seen = 0;
     const order = [S.cur, ...S.images.filter(i => i !== S.cur)];
     for (const [i, im] of order.entries()) {
-      setStatus(`reading screenshot ${i + 1} of ${order.length}…`);
+      setStatus(`reading ${i + 1}/${order.length}…`);
       const { c, f } = ocrCanvas(im);
       const { data } = await w.recognize(c, {}, { blocks: true });
       const hits = wordsOf(data).filter(x => nameMatches(norm(x.text || ''), target));
@@ -1510,9 +1502,9 @@ async function findByName() {
     }
     await idle();
     setStatus('');
-    if (added) toast(`found "${$('findName').value.trim()}" and hid every copy. avatars still need a box.`, 3500);
-    else if (seen) toast('that name is already hidden', 2500);
-    else toast(`couldn't read "${$('findName').value.trim()}" anywhere. drag a box around it instead.`, 3500);
+    if (added) toast('found it');
+    else if (seen) toast('already hidden');
+    else toast("couldn't find it", 2500);
   } catch (err) {
     setStatus('');
     toast(String(err.message || err), 3500);
