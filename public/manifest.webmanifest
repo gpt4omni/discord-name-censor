@@ -1,7 +1,7 @@
 {
-  "name": "censor · hide your name in discord screenshots",
+  "name": "censor",
   "short_name": "censor",
-  "description": "hide your name and avatar in discord screenshots before you share them. runs in your browser.",
+  "description": "hide your name in discord screenshots",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

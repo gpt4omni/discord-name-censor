@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>censor · hide your name in discord screenshots</title>
-<meta name="description" content="hide your name and avatar in discord screenshots before you share them. runs in your browser.">
+<title>censor</title>
+<meta name="description" content="hide your name in discord screenshots">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -63,12 +63,8 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:250px 1fr}
 .tasks{order:-1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px;border-right:1px solid var(--line);
   background:linear-gradient(180deg,#f7dbec 0%,#e2cdf2 60%,#cfbdf0 100%)}
 .pane{background:#fff;border-radius:4px 4px 2px 2px;box-shadow:0 1px 2px rgba(80,40,110,.18)}
-.pane>h2,.pane>summary{margin:0;padding:5px 10px;font:bold 12px var(--title-font);color:var(--pane-head);border-radius:4px 4px 0 0;
+.pane>h2{margin:0;padding:5px 10px;font:bold 12px var(--title-font);color:var(--pane-head);border-radius:4px 4px 0 0;
   background:linear-gradient(90deg,#fff 0%,#fbeaf4 60%,#f0d7ea 100%)}
-.pane>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between}
-.pane>summary::-webkit-details-marker{display:none}
-.pane>summary::after{content:"▾";font-size:10px}
-.pane[open]>summary::after{content:"▴"}
 .pane .body{padding:8px 10px 10px;background:#fdf6fa;border-top:1px solid #fff;border-radius:0 0 2px 2px}
 .hint{color:var(--dim);margin:0}
 .hint b{color:var(--text)}
@@ -98,9 +94,6 @@ input[type=range]{width:100%;accent-color:var(--pink-dark)}
 input[type=checkbox]{accent-color:var(--pink-dark);width:13px;height:13px;margin:0}
 .check{display:flex;gap:7px;align-items:flex-start;cursor:pointer}
 .check input{margin-top:2px}
-.links{display:flex;flex-direction:column;gap:4px}
-.links a{display:flex;align-items:center;gap:7px}
-.links .ico{width:16px;height:16px;flex:none;border-radius:3px;display:grid;place-items:center;font:bold 10px var(--ui);color:#fff}
 
 #right{display:flex;flex-direction:column;min-width:0;min-height:0}
 #stageBox{position:relative;flex:1;min-height:0;display:flex}
@@ -165,7 +158,7 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
 <body>
 <div class="window">
   <div class="titlebar">
-    <h1>censor <span>· hide your name in discord screenshots</span></h1>
+    <h1>censor <span>for discord screenshots</span></h1>
     <a class="by" href="https://milly.works4you.dev/" target="_blank" rel="noopener">made by milly</a>
   </div>
   <div class="commands">
@@ -231,17 +224,17 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
         <div class="body">
           <div class="row"><label for="style">style</label>
             <select id="style">
-              <option value="erase">erase (match background)</option>
-              <option value="solid">solid block</option>
+              <option value="erase">erase</option>
+              <option value="solid">solid</option>
               <option value="pixel">pixelate</option>
               <option value="blur">blur</option>
             </select>
             <input type="color" id="color" value="#000000" title="block colour">
           </div>
           <div class="row"><label for="pad">padding</label><input type="range" id="pad" min="0" max="12" value="2" style="width:110px"></div>
-          <label class="check" style="margin-bottom:7px"><input type="checkbox" id="outlines" checked><span>show outlines while editing</span></label>
+          <label class="check" style="margin-bottom:7px"><input type="checkbox" id="outlines" checked><span>show outlines</span></label>
           <label class="check" style="margin-bottom:7px"><input type="checkbox" id="plainNames" checked><span>rename files to censored-01.png</span></label>
-          <p class="hint">blur and pixelate can sometimes be reversed</p>
+          <p class="hint">blur and pixelate aren't safe</p>
         </div>
       </section>
       <section class="pane">
@@ -250,30 +243,11 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
           <label class="check"><input type="checkbox" id="remember"><span>remember on this device</span></label>
         </div>
       </section>
-      <details class="pane">
-        <summary>how to use</summary>
-        <div class="body">
-          <ol class="hint">
-            <li>drag a box around your name</li>
-            <li>then your avatar</li>
-            <li>then the small name and avatar on reply lines</li>
-            <li>click a box to turn it off</li>
-          </ol>
-          <p class="hint" style="margin-top:6px"><kbd>space</kbd> peek · <kbd>←</kbd> <kbd>→</kbd> switch · <kbd>n</kbd> next match · <kbd>x</kbd> toggle · <kbd>m</kbd> <kbd>b</kbd> <kbd>c</kbd> tools</p>
-        </div>
-      </details>
-      <section class="pane">
-        <h2>find me</h2>
-        <div class="body links">
-          <a href="https://milly.works4you.dev/" target="_blank" rel="noopener"><span class="ico" style="background:var(--pink)">m</span>milly.works4you.dev</a>
-          <a href="https://github.com/starsfellontrench/discord-name-censor" target="_blank" rel="noopener"><span class="ico" style="background:#24292f">&lt;/&gt;</span>source on github</a>
-        </div>
-      </section>
     </aside>
   </main>
   <div class="statusbar">
     <span class="cell" id="objects">no screenshots</span>
-    <span class="end"><a href="https://milly.works4you.dev/" target="_blank" rel="noopener">milly.works4you.dev</a></span>
+    <span class="end"><a href="https://github.com/starsfellontrench/discord-name-censor" target="_blank" rel="noopener">github</a>&nbsp;&nbsp;<a href="https://milly.works4you.dev/" target="_blank" rel="noopener">milly.works4you.dev</a></span>
   </div>
 </div>
 <div id="status" class="balloon" role="status" aria-live="polite"></div>
@@ -1087,7 +1061,7 @@ function renderStrip() {
     el.appendChild(t);
   }
   const add = document.createElement('button');
-  add.className = 'add-tile'; add.textContent = '+ add more';
+  add.className = 'add-tile'; add.textContent = '+ add';
   add.onclick = () => $('file').click();
   el.appendChild(add);
   renderCounts();
