@@ -195,7 +195,8 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
         <div class="body">
           <div class="row"><label for="style">style</label>
             <select id="style">
-              <option value="solid">solid block</option>
+              <option value="erase">erase (match background)</option>
+                <option value="solid">solid block</option>
               <option value="pixel">pixelate</option>
               <option value="blur">blur</option>
             </select>
@@ -203,7 +204,7 @@ body.dragging #stage::after{content:"drop to add";position:absolute;inset:8px;bo
           </div>
           <div class="row"><label for="pad">padding</label><input type="range" id="pad" min="0" max="12" value="2" style="width:110px"></div>
           <label class="check" style="margin-bottom:7px"><input type="checkbox" id="outlines" checked><span>show outlines while editing</span></label>
-          <p class="hint">solid block is the safe one. blur and pixelate can sometimes be undone.</p>
+          <p class="hint">erase and solid block are the safe ones. blur and pixelate can sometimes be undone.</p>
         </div>
       </section>
       <section class="pane">
@@ -595,8 +596,24 @@ function padRect(r, im) {
 function isPending(im) { return S.samples.some(s => im.results.get(s.id) === null); }
 function countOn(im) { return regions(im).filter(r => r.on).length; }
 
-function censor(ctx, src, r) {
-  const style = $('style').value;
+function backgroundAround(im, r) {
+  const m = 2, x0 = Math.max(0, r.x - m), y0 = Math.max(0, r.y - m);
+  const x1 = Math.min(im.w, r.x + r.w + m), y1 = Math.min(im.h, r.y + r.h + m), w = x1 - x0, h = y1 - y0;
+  const d = im.ctx.getImageData(x0, y0, w, h).data, counts = new Map();
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const ix = x0 + x, iy = y0 + y;
+    if (ix >= r.x && ix < r.x + r.w && iy >= r.y && iy < r.y + r.h) continue;
+    const p = (y * w + x) * 4, k = d[p] << 16 | d[p + 1] << 8 | d[p + 2];
+    counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  let best = 0, key = 0;
+  for (const [k, c] of counts) if (c > best) { best = c; key = k; }
+  return best ? '#' + key.toString(16).padStart(6, '0') : '#000000';
+}
+
+function censor(ctx, im, r) {
+  const src = im.el, style = $('style').value;
+  if (style === 'erase') { ctx.fillStyle = backgroundAround(im, r); ctx.fillRect(r.x, r.y, r.w, r.h); return; }
   if (style === 'solid') { ctx.fillStyle = $('color').value; ctx.fillRect(r.x, r.y, r.w, r.h); return; }
   if (style === 'blur' && 'filter' in ctx) {
     const rad = Math.max(4, Math.round(Math.min(r.w, r.h) / 3)), m = rad * 2;
@@ -613,7 +630,7 @@ function censor(ctx, src, r) {
 
 function paint(ctx, im, peek) {
   ctx.drawImage(im.el, 0, 0);
-  if (!peek) for (const r of regions(im)) if (r.on) censor(ctx, im.el, padRect(r, im));
+  if (!peek) for (const r of regions(im)) if (r.on) censor(ctx, im, padRect(r, im));
 }
 
 function zoomFactor() {
@@ -978,7 +995,7 @@ window.addEventListener('blur', () => { if (S.peek) { S.peek = false; renderStag
 (async () => {
   const l = storeGet(STORE.look);
   if (l) {
-    if (['solid', 'pixel', 'blur'].includes(l.style)) $('style').value = l.style;
+    if (['erase', 'solid', 'pixel', 'blur'].includes(l.style)) $('style').value = l.style;
     if (/^#[0-9a-f]{6}$/i.test(l.color)) $('color').value = l.color;
     if (Number.isFinite(l.pad)) $('pad').value = l.pad;
     $('outlines').checked = l.outlines !== false;
